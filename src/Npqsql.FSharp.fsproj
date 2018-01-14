@@ -1,7 +1,18 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp2.0</TargetFramework>
+    <Description>Thin F# wrapper around Npqsql, the PostgreSQL database driver. Edit
+Add topics
+</Description>
+    <PackageProjectUrl>https://github.com/Zaid-Ajaj/Npgsql.FSharp</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Zaid-Ajaj/Npgsql.FSharp.git</RepositoryUrl>
+    <PackageLicenseUrl>https://github.com/Zaid-Ajaj/Npgsql.FSharp/blob/master/LICENSE</PackageLicenseUrl>
+    <PackageIconUrl></PackageIconUrl>
+    <PackageTags>fsharp;fable;postgres;sql;ngpsql</PackageTags>
+    <Authors>Zaid Ajaj</Authors>
+    <Version>0.1.0</Version>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>

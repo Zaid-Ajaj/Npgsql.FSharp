@@ -2,17 +2,27 @@
 
 Thin F# wrapper for Npqsql, the PostgreSQL database driver. 
 
-This wrapper still works with *raw* SQL but it maps the data from the database into the `Sql` data structure making it easy to pattern match against the results.
+This wrapper still works with *raw* SQL but it maps the data from the database into the `Sql` data structure making it easy to pattern match and transform the results.
+
+TODO:
+ - More `Sql` types that map to Postgres data types
+ - More config options when for connection string builder
 
 Given the types:
 ```fs
 type Sql =
   | Int of int
   | String of string
-  | Bool of bool 
-  | Number of float
+  | Long of int64
   | Date of DateTime
-  | (* other data types *)
+  | Byte of byte
+  | Bool of bool
+  | Number of double
+  | Decimal of decimal
+  | Char of char
+  | Null
+  | Other of obj
+  | (* TODO: other data types *)
 
 // A row is a list of key/value pairs
 type SqlRow = list<string * Sql>
@@ -42,12 +52,11 @@ type User = {
     LastName: string
 }
 
-let getAllUsers() = 
+let getAllUsers() : User list = 
     defaultConnection
     |> Sql.connect
     |> Sql.query "SELECT * FROM \"users\""
     |> Sql.executeTable // SqlTable
-    // |> Sql.executeTableAsync is the async version
     |> Sql.mapEachRow (function
         | [ "user_id", Int id
             "first_name", String fname
@@ -84,7 +93,7 @@ let serverTime() : Option<DateTime> =
 ```
 ### Retrieve single value safely asynchronously
 ```fs
-// ping the server
+// ping the database
 let serverTime() : Async<Option<DateTime>> =
     async {
         let! result =
@@ -92,17 +101,11 @@ let serverTime() : Async<Option<DateTime>> =
           |> Sql.connect
           |> Sql.query "SELECT NOW()"
           |> Sql.executeScalarSafeAsync
+        
         match result with
         | Ok (Date time) -> return Some time
-        | Error ex -> return None
+        | otherwise -> return None
     }
-    
-    
-    
-    
-    
-    
-    
 ```
 ### Batch queries in a single roundtrip to the database
 ```fs
