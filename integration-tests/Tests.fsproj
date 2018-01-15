@@ -10,7 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../src/Npqsql.FSharp.fsproj" />
+    <ProjectReference Include="../src/Npgsql.FSharp.fsproj" />
   </ItemGroup>
   
   <Import Project="..\.paket\Paket.Restore.targets" />

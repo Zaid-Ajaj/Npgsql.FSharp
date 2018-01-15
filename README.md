@@ -4,10 +4,6 @@ Thin F# wrapper for [Npqsql](https://github.com/npgsql/npgsql), data provider fo
 
 This wrapper maps *raw* SQL data from the database into the `Sql` data structure making it easy to pattern match against and transform the results.
 
-TODO:
- - More `Sql` types that map to Postgres data types
- - More config options when for connection string builder
-
 Given the types:
 ```fs
 type Sql =
@@ -22,7 +18,6 @@ type Sql =
   | Char of char
   | Null
   | Other of obj
-  | (* TODO: other data types *)
 
 // A row is a list of key/value pairs
 type SqlRow = list<string * Sql>
