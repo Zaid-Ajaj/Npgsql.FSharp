@@ -155,7 +155,6 @@ module Sql =
 
         readRows []
 
-    // TDODO
     let private populateCmd (cmd: NpgsqlCommand) (props: SqlProps) = 
         if props.IsFunction then
           cmd.CommandType <- CommandType.StoredProcedure
@@ -202,6 +201,22 @@ module Sql =
         return! readTableAsync (reader |> unbox<NpgsqlDataReader>)
       }
       |> Async.AwaitTask
+
+    let executeTableSafeAsync (props: SqlProps) : Async<Result<SqlTable, exn>> = 
+        task {
+            try
+              if List.isEmpty props.SqlQuery then failwith "No query provided to execute..."
+              use connection = new NpgsqlConnection(props.ConnectionString)
+              do! connection.OpenAsync()
+              use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
+              do populateCmd command props
+              use! reader = command.ExecuteReaderAsync()
+              let! result = readTableAsync (reader |> unbox<NpgsqlDataReader>)
+              return Ok (result)
+            with 
+            | ex -> return Error ex
+        }
+        |> Async.AwaitTask        
         
     let multiline xs = String.concat Environment.NewLine xs
 
