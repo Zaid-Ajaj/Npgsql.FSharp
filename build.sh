@@ -21,6 +21,7 @@ fi
 run() {
   if [ "$OS" != "Windows_NT" ]
   then
+    export FrameworkPathOverride=$(dirname $(which mono))/../lib/mono/4.5/
     echo "Running on linux/macs => using Mono"
     mono "$@"
   else
