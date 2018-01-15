@@ -1,4 +1,4 @@
-# Npgsql.FSharp
+# Npgsql.FSharp [![Nuget](https://img.shields.io/nuget/v/Npgsql.FSharp.svg?colorB=green)](https://www.nuget.org/packages/Npgsql.FSharp)
 
 Thin F# wrapper for Npqsql, the PostgreSQL database driver. 
 
