@@ -79,9 +79,9 @@ let userExists (name: string) : bool =
 // ping the database
 let serverTime() : Option<DateTime> = 
     defaultConnection
-    |> Pg.connect
-    |> Pg.query "SELECT NOW()"
-    |> Pg.executeScalarSafe
+    |> Sql.connect
+    |> Sql.query "SELECT NOW()"
+    |> Sql.executeScalarSafe
     |> function
         | Ok (Date time) -> Some time
         | _ -> None
@@ -93,9 +93,9 @@ let serverTime() : Async<Option<DateTime>> =
     async {
         let! result =
           defaultConnection
-          |> Pg.connect
-          |> Pg.query "SELECT NOW()"
-          |> Pg.executeScalarSafeAsync
+          |> Sql.connect
+          |> Sql.query "SELECT NOW()"
+          |> Sql.executeScalarSafeAsync
         
         match result with
         | Ok (Date time) -> return Some time
