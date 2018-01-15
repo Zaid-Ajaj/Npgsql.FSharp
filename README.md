@@ -1,8 +1,8 @@
 # Npgsql.FSharp [![Nuget](https://img.shields.io/nuget/v/Npgsql.FSharp.svg?colorB=green)](https://www.nuget.org/packages/Npgsql.FSharp)
 
-Thin F# wrapper for Npqsql, the PostgreSQL database driver. 
+Thin F# wrapper for [Npqsql](https://github.com/npgsql/npgsql), data provider for PostgreSQL. 
 
-This wrapper still works with *raw* SQL but it maps the data from the database into the `Sql` data structure making it easy to pattern match and transform the results.
+This wrapper maps *raw* SQL data from the database into the `Sql` data structure making it easy to pattern match against and transform the results.
 
 TODO:
  - More `Sql` types that map to Postgres data types
