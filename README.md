@@ -79,14 +79,17 @@ let userExists (name: string) : bool =
 ```fs
 // Insert a book with it's attributes stored as HStore values
 let bookAttributes = 
-    ["isbn", "46243425212"
-     "page-count", "423"
-     "weight", "500g"]
-    |> Map.ofSeq
+    Map.empty
+    |> Map.add "isbn" "46243425212"
+    |> Map.add "page-count" "423"
+    |> Map.add "weight" "500g"
 
-defaultConnection()
-|> Sql.query "insert into \"books\" (id, attrs) values (1, @attributes)"
-|> Sql.parameters ["attributes", HStore bookAttributes]
+defaultConnection
+|> Sql.query "INSERT INTO \"books\" (id,title,attrs) VALUES (@bookId,@title,@attributes)"
+|> Sql.parameters 
+    [ "bookId", Int 20
+      "title", String "Lord of the rings"
+      "attributes", HStore bookAttributes ]
 |> Sql.executeNonQuery
 ```
 ### Retrieve single value safely
