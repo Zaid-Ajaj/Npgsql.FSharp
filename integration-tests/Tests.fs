@@ -77,3 +77,23 @@ defaultConnection()
 |> Sql.executeMany
 |> List.iter (fun table -> 
     printfn "Table:\n%A\n" table)
+
+
+// Reading HStore values
+// CREATE TABLE test
+// ALTER TABLE test ADD COLUMN attrs hstore NOT NULL DEFAULT ''::hstore
+defaultConnection()
+|> Sql.query "select * from \"test\""
+|> Sql.executeTable
+|> printfn "%A"
+
+
+let inputMap = 
+    ["property", "value from F#"]
+    |> Map.ofSeq
+
+defaultConnection()
+|> Sql.query "insert into \"test\" (attrs) values (@map)"
+|> Sql.parameters ["map", HStore inputMap]
+|> Sql.executeNonQuery
+|> printfn "Rows affected %d"

@@ -5,6 +5,7 @@ open Npgsql
 open Giraffe.Tasks
 open System.Threading.Tasks
 open System.Data
+open System.Collections.Generic
 
 type Sql = 
     | Int of int
@@ -15,6 +16,7 @@ type Sql =
     | Bool of bool
     | Number of double
     | Decimal of decimal
+    | HStore of Map<string, string>
     | Char of char
     | Null
     | Other of obj
@@ -110,6 +112,11 @@ module Sql =
         | :? double as x ->  Number x
         | :? decimal as x -> Decimal x
         | :? char as x -> Char x
+        | :? IDictionary<string, string> as dict -> 
+            dict
+            |> Seq.map (|KeyValue|)
+            |> Map.ofSeq
+            |> HStore
         | _ -> Other value
         
     let readRow (reader : NpgsqlDataReader) : SqlRow = 
@@ -156,26 +163,33 @@ module Sql =
         readRows []
 
     let private populateCmd (cmd: NpgsqlCommand) (props: SqlProps) = 
-        if props.IsFunction then
-          cmd.CommandType <- CommandType.StoredProcedure
-          for param in props.Parameters do 
-            let paramValue : obj =
-              match snd param with
-              | String text -> upcast text
-              | Int i -> upcast i
-              | Date date -> upcast date
-              | Number n -> upcast n
-              | Bool b -> upcast b
-              | Char x -> upcast x
-              | Decimal x -> upcast x
-              | Long x -> upcast x
-              | Byte x -> upcast x
-              | Null -> null
-              | _ -> null // TODO
+        if props.IsFunction then cmd.CommandType <- CommandType.StoredProcedure
+        
+        for param in props.Parameters do 
+          let paramValue : obj =
+            match snd param with
+            | String text -> upcast text
+            | Int i -> upcast i
+            | Date date -> upcast date
+            | Number n -> upcast n
+            | Bool b -> upcast b
+            | Char x -> upcast x
+            | Decimal x -> upcast x
+            | Long x -> upcast x
+            | Byte x -> upcast x
+            | HStore dictionary ->
+                let value =
+                  dictionary
+                  |> Map.toList 
+                  |> dict
+                  |> Dictionary
+                upcast value
+            | Null -> null
+            | Other x -> x
+           
 
-            let paramName = sprintf "@%s" (fst param)
-            cmd.Parameters.AddWithValue(paramName, paramValue) |> ignore
-        else ()
+          let paramName = sprintf "@%s" (fst param)
+          cmd.Parameters.AddWithValue(paramName, paramValue) |> ignore
 
     let executeTable (props: SqlProps) : SqlTable = 
         if List.isEmpty props.SqlQuery then failwith "No query provided to execute..."

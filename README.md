@@ -16,6 +16,7 @@ type Sql =
   | Number of double
   | Decimal of decimal
   | Char of char
+  | HStore of Map<string, string>
   | Null
   | Other of obj
 
@@ -73,6 +74,20 @@ let userExists (name: string) : bool =
     |> Sql.parameters ["username", String name]
     |> Sql.executeScalar // Sql
     |> Sql.toBool
+```
+### Parameterize queries with complex parameters like hstore 
+```fs
+// Insert a book with it's attributes stored as HStore values
+let bookAttributes = 
+    ["isbn", "46243425212"
+     "page-count", "423"
+     "weight", "500g"]
+    |> Map.ofSeq
+
+defaultConnection()
+|> Sql.query "insert into \"books\" (id, attrs) values (1, @attributes)"
+|> Sql.parameters ["attributes", HStore bookAttributes]
+|> Sql.executeNonQuery
 ```
 ### Retrieve single value safely
 ```fs
