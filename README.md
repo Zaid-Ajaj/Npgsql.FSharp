@@ -6,19 +6,20 @@ This wrapper maps *raw* SQL data from the database into the `Sql` data structure
 
 Given the types:
 ```fs
-type Sql =
-  | Int of int
-  | String of string
-  | Long of int64
-  | Date of DateTime
-  | Byte of byte
-  | Bool of bool
-  | Number of double
-  | Decimal of decimal
-  | Char of char
-  | HStore of Map<string, string>
-  | Null
-  | Other of obj
+type Sql = 
+    | Short of int16
+    | Int of int
+    | Long of int64
+    | String of string
+    | Date of DateTime
+    | Bool of bool
+    | Number of double
+    | Decimal of decimal
+    | Bytea of byte[] 
+    | HStore of Map<string, string>
+    | Uuid of Guid
+    | Null
+    | Other of obj
 
 // A row is a list of key/value pairs
 type SqlRow = list<string * Sql>

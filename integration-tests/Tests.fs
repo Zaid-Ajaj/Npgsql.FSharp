@@ -97,3 +97,43 @@ defaultConnection()
 |> Sql.parameters ["map", HStore inputMap]
 |> Sql.executeNonQuery
 |> printfn "Rows affected %d"
+
+
+let bytesInput = 
+    [1 .. 5]
+    |> List.map byte
+    |> Array.ofList
+
+defaultConnection()
+|> Sql.query "SELECT @manyBytes"
+|> Sql.parameters [ "manyBytes", Bytea bytesInput ]
+|> Sql.executeScalar
+|> function
+    | Bytea output -> if (output <> bytesInput) 
+                      then failwith "Bytea roundtrip failed, the output was different"
+                      else printfn "Bytea roundtrip worked"
+
+    | otherwise -> failwith "Bytea roundtrip failed"
+
+
+let guid = System.Guid.NewGuid()
+
+defaultConnection()
+|> Sql.query "SELECT @uuid_input"
+|> Sql.parameters [ "uuid_input", Uuid guid ]
+|> Sql.executeScalar
+|> function
+    | Uuid output -> if (output.ToString() <> guid.ToString()) 
+                      then failwith "Uuid roundtrip failed, the output was different"
+                      else printfn "Uuid roundtrip worked"
+                      
+    | otherwise -> failwith "Uuid roundtrip failed"
+
+
+defaultConnection()
+|> Sql.query "SELECT @money_input::money"
+|> Sql.parameters [ "money_input", Decimal 12.5M ]
+|> Sql.executeScalar
+|> function
+    | Decimal 12.5M -> printfn "Money as decimal roundtrip worked"
+    | otherwise -> failwith "Money as decimal roundtrip failed"

@@ -4,7 +4,6 @@ group Main
     
     nuget FSharp.Core
     nuget Npgsql
-    nuget Giraffe.Tasks
 
 group Build
   source https://api.nuget.org/v3/index.json

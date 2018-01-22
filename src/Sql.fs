@@ -2,22 +2,22 @@ namespace Npgsql.FSharp
 
 open System
 open Npgsql
-open Giraffe.Tasks
 open System.Threading.Tasks
 open System.Data
 open System.Collections.Generic
 
 type Sql = 
+    | Short of int16
     | Int of int
-    | String of string
     | Long of int64
+    | String of string
     | Date of DateTime
-    | Byte of byte
     | Bool of bool
     | Number of double
     | Decimal of decimal
+    | Bytea of byte[] 
     | HStore of Map<string, string>
-    | Char of char
+    | Uuid of Guid
     | Null
     | Other of obj
     
@@ -97,10 +97,6 @@ module Sql =
         | Number x -> x
         | value -> failwithf "Could not convert %A into a floating number" value
 
-    let toByte = function
-        | Byte x -> x 
-        | value -> failwithf "Could not convert %A into a byte" value
-
     let readValue value = 
         match box value with
         | :? int32 as x -> Int x
@@ -108,10 +104,10 @@ module Sql =
         | :? System.DateTime as x -> Date x
         | :? bool as x ->  Bool x
         | :? int64 as x ->  Long x
-        | :? byte as x ->  Byte x
-        | :? double as x ->  Number x
         | :? decimal as x -> Decimal x
-        | :? char as x -> Char x
+        | :? double as x ->  Number x
+        | :? System.Guid as x -> Uuid x
+        | :? array<byte> as xs -> Bytea xs
         | :? IDictionary<string, string> as dict -> 
             dict
             |> Seq.map (|KeyValue|)
@@ -122,11 +118,12 @@ module Sql =
     let readRow (reader : NpgsqlDataReader) : SqlRow = 
         
         let readFieldSync fieldIndex = 
+            
             let fieldName = reader.GetName(fieldIndex)
             if reader.IsDBNull(fieldIndex) 
             then fieldName, Null
             else fieldName, readValue (reader.GetFieldValue(fieldIndex))
-
+            
         [0 .. reader.FieldCount - 1]
         |> List.map readFieldSync
 
@@ -170,13 +167,14 @@ module Sql =
             match snd param with
             | String text -> upcast text
             | Int i -> upcast i
+            | Uuid x -> upcast x
+            | Short x -> upcast x
             | Date date -> upcast date
             | Number n -> upcast n
             | Bool b -> upcast b
-            | Char x -> upcast x
             | Decimal x -> upcast x
             | Long x -> upcast x
-            | Byte x -> upcast x
+            | Bytea x -> upcast x
             | HStore dictionary ->
                 let value =
                   dictionary
