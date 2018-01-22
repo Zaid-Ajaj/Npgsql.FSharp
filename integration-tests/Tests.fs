@@ -137,3 +137,11 @@ defaultConnection()
 |> function
     | Decimal 12.5M -> printfn "Money as decimal roundtrip worked"
     | otherwise -> failwith "Money as decimal roundtrip failed"
+
+
+defaultConnection()
+|> Sql.query "SELECT uuid_generate_v4()"
+|> Sql.executeScalar
+|> function
+    | Uuid output -> printfn "Uuid generated: %A" output
+    | otherwise -> failwith "Uuid could not be read failed"
