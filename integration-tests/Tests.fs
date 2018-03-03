@@ -78,12 +78,25 @@ defaultConnection()
 |> List.iter (fun table -> 
     printfn "Table:\n%A\n" table)
 
+let sqlQuery = """
+select * from
+   -- group logs by request id
+   (select json_agg(properties) as "Logs",
+           properties->'Properties'->>'RequestId' as "RequestId"
+    from logs
+    group by properties->'Properties'->>'RequestId') requests
 
-// Reading HStore values
-// CREATE TABLE test
-// ALTER TABLE test ADD COLUMN attrs hstore NOT NULL DEFAULT ''::hstore
-defaultConnection()
-|> Sql.query "select * from \"test\""
+-- The first log is always the request log, so we filter here by Method
+where "Logs"->0->'Properties'->>'Method' = 'POST'
+"""
+
+Sql.host "localhost"
+|> Sql.username (getEnv "PG_USER")
+|> Sql.password (getEnv "PG_PASS")
+|> Sql.database "Logs"
+|> Sql.str
+|> Sql.connect
+|> Sql.query sqlQuery
 |> Sql.executeTable
 |> printfn "%A"
 
@@ -93,10 +106,16 @@ let inputMap =
     |> Map.ofSeq
 
 defaultConnection()
-|> Sql.query "insert into \"test\" (attrs) values (@map)"
+|> Sql.query "select @map"
 |> Sql.parameters ["map", HStore inputMap]
-|> Sql.executeNonQuery
-|> printfn "Rows affected %d"
+|> Sql.executeScalar
+|> function 
+    | HStore map -> 
+        match Map.tryFind "property" map with
+        | Some "value from F#" -> "Mapping HStore works"
+        | otherwise -> "Something went wrong when reading HStore"
+    | otherwise -> "Something went wrong when mapping HStore"
+|> printfn "%A"
 
 
 let bytesInput = 
