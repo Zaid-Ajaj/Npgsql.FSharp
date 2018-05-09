@@ -1,8 +1,9 @@
 group Main
     source https://api.nuget.org/v3/index.json
     storage:none
-    
+
     nuget FSharp.Core
+    nuget TaskBuilder.fs
     nuget Npgsql
 
 group Build
