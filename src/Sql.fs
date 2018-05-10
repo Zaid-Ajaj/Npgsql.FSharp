@@ -219,7 +219,7 @@ module Sql =
             use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
             do populateCmd command props
             use! reader = command.ExecuteReaderAsync()
-            return! readTableAsync (reader |> unbox<NpgsqlDataReader>)
+            return! readTableTask (reader |> unbox<NpgsqlDataReader>)
         }
 
     let executeTableAsync (props: SqlProps) =
@@ -235,7 +235,7 @@ module Sql =
                 use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
                 do populateCmd command props
                 use! reader = command.ExecuteReaderAsync()
-                let! result = readTableAsync (reader |> unbox<NpgsqlDataReader>)
+                let! result = readTableTask (reader |> unbox<NpgsqlDataReader>)
                 return Ok (result)
             with
             | ex -> return Error ex
