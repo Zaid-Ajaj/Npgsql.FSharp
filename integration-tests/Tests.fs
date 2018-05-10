@@ -90,21 +90,27 @@ defaultConnection()
 // |> printfn "%A"
 
 
-// let inputMap =
-//     ["property", "value from F#"]
-//     |> Map.ofSeq
 
-// defaultConnection()
-// |> Sql.query "select @map"
-// |> Sql.parameters ["map", HStore inputMap]
-// |> Sql.executeScalar
-// |> function
-//     | HStore map ->
-//         match Map.tryFind "property" map with
-//         | Some "value from F#" -> "Mapping HStore works"
-//         | _ -> "Something went wrong when reading HStore"
-//     | _ -> "Something went wrong when mapping HStore"
-// |> printfn "%A"
+defaultConnection()
+|> Sql.query "CREATE EXTENSION IF NOT EXISTS hstore"
+|> Sql.executeNonQuery
+|> printfn "Create Extention hstore returned %A"
+
+let inputMap =
+    ["property", "value from F#"]
+    |> Map.ofSeq
+
+defaultConnection()
+|> Sql.query "select @map"
+|> Sql.parameters ["map", HStore inputMap]
+|> Sql.executeScalar
+|> function
+    | HStore map ->
+        match Map.tryFind "property" map with
+        | Some "value from F#" -> "Mapping HStore works"
+        | _ -> "Something went wrong when reading HStore"
+    | _ -> "Something went wrong when mapping HStore"
+|> printfn "%A"
 
 // Unhandled Exception: System.NotSupportedException: Npgsql 3.x removed support for writing a parameter with an IEnumerable value, use .ToList()/.ToArray() instead
 // Need to add a NpgsqlTypeHandler for Map ?
