@@ -114,6 +114,7 @@ module Sql =
             |> Seq.map (|KeyValue|)
             |> Map.ofSeq
             |> HStore
+        | null -> Null
         | _ -> Other value
 
     let readRow (reader : NpgsqlDataReader) : SqlRow =
