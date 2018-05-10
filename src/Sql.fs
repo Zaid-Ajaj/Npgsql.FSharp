@@ -128,8 +128,8 @@ module Sql =
         [0 .. reader.FieldCount - 1]
         |> List.map readFieldSync
 
-    let readRowAsync (reader: NpgsqlDataReader) =
-        let readValueAsync fieldIndex =
+    let readRowTask (reader: NpgsqlDataReader) =
+        let readValueTask fieldIndex =
           task {
               let fieldName = reader.GetName fieldIndex
               let! isNull = reader.IsDBNullAsync fieldIndex
@@ -141,24 +141,31 @@ module Sql =
           }
 
         [0 .. reader.FieldCount - 1]
-        |> List.map readValueAsync
+        |> List.map readValueTask
         |> Task.WhenAll
+
+    let readRowAsync (reader: NpgsqlDataReader) =
+        readRowTask reader
+        |> Async.AwaitTask
+
 
     let readTable (reader: NpgsqlDataReader) : SqlTable =
         [ while reader.Read() do yield readRow reader ]
 
-    let readTableAsync (reader: NpgsqlDataReader) =
-
+    let readTableTask (reader: NpgsqlDataReader) =
         let rec readRows rows = task {
             let! canRead = reader.ReadAsync()
             if canRead then
-              let! row = readRowAsync reader
+              let! row = readRowTask reader
               return! readRows (List.ofArray row :: rows)
             else
               return rows
         }
-
         readRows []
+
+    let readTableAsync (reader: NpgsqlDataReader) =
+        readTableTask reader
+        |> Async.AwaitTask
 
     let private populateCmd (cmd: NpgsqlCommand) (props: SqlProps) =
         if props.IsFunction then cmd.CommandType <- CommandType.StoredProcedure
@@ -203,32 +210,38 @@ module Sql =
         try Ok (executeTable props)
         with | ex -> Error ex
 
-    let executeTableAsync (props: SqlProps) :  Async<SqlTable> =
-      task {
-        if List.isEmpty props.SqlQuery then failwith "No query provided to execute..."
-        use connection = new NpgsqlConnection(props.ConnectionString)
-        do! connection.OpenAsync()
-        use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
-        do populateCmd command props
-        use! reader = command.ExecuteReaderAsync()
-        return! readTableAsync (reader |> unbox<NpgsqlDataReader>)
-      }
-      |> Async.AwaitTask
+    let executeTableTask (props: SqlProps) =
+        task {
+            if List.isEmpty props.SqlQuery then failwith "No query provided to execute..."
+            use connection = new NpgsqlConnection(props.ConnectionString)
+            do! connection.OpenAsync()
+            use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
+            do populateCmd command props
+            use! reader = command.ExecuteReaderAsync()
+            return! readTableAsync (reader |> unbox<NpgsqlDataReader>)
+        }
 
-    let executeTableSafeAsync (props: SqlProps) : Async<Result<SqlTable, exn>> =
+    let executeTableAsync (props: SqlProps) =
+        executeTableTask props
+        |> Async.AwaitTask
+
+    let executeTableSafeTask (props: SqlProps) =
         task {
             try
-              if List.isEmpty props.SqlQuery then failwith "No query provided to execute..."
-              use connection = new NpgsqlConnection(props.ConnectionString)
-              do! connection.OpenAsync()
-              use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
-              do populateCmd command props
-              use! reader = command.ExecuteReaderAsync()
-              let! result = readTableAsync (reader |> unbox<NpgsqlDataReader>)
-              return Ok (result)
+                if List.isEmpty props.SqlQuery then failwith "No query provided to execute..."
+                use connection = new NpgsqlConnection(props.ConnectionString)
+                do! connection.OpenAsync()
+                use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
+                do populateCmd command props
+                use! reader = command.ExecuteReaderAsync()
+                let! result = readTableAsync (reader |> unbox<NpgsqlDataReader>)
+                return Ok (result)
             with
             | ex -> return Error ex
         }
+
+    let executeTableSafeAsync (props: SqlProps) =
+        executeTableSafeTask props
         |> Async.AwaitTask
 
     let multiline xs = String.concat Environment.NewLine xs
@@ -267,61 +280,72 @@ module Sql =
         try Ok (executeNonQuery props)
         with | ex -> Error ex
 
-    let executeNonQueryAsync (props: SqlProps) : Async<int> =
+    let executeNonQueryTask (props: SqlProps) =
         task {
-          use connection = new NpgsqlConnection(props.ConnectionString)
-          do! connection.OpenAsync()
-          use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
-          do populateCmd command props
-          return! command.ExecuteNonQueryAsync()
-        }
-        |> Async.AwaitTask
-
-    let executeNonQuerySafeAsync (props: SqlProps) : Async<Result<int, exn>> =
-        task {
-          try
             use connection = new NpgsqlConnection(props.ConnectionString)
             do! connection.OpenAsync()
             use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
             do populateCmd command props
-            let! result = command.ExecuteNonQueryAsync()
-            return Ok (result)
-          with
+            return! command.ExecuteNonQueryAsync()
+        }
+
+    let executeNonQueryAsync  (props: SqlProps) =
+        executeNonQueryTask props
+        |> Async.AwaitTask
+
+    let executeNonQuerySafeTask (props: SqlProps) =
+        task {
+            try
+                use connection = new NpgsqlConnection(props.ConnectionString)
+                do! connection.OpenAsync()
+                use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
+                do populateCmd command props
+                let! result = command.ExecuteNonQueryAsync()
+                return Ok (result)
+            with
             | ex -> return Error ex
         }
+
+    let executeNonQuerySafeAsync (props: SqlProps) =
+        executeNonQuerySafeTask props
         |> Async.AwaitTask
 
     let executeScalarSafe (props: SqlProps) : Result<Sql, exn> =
         try  Ok (executeScalar props)
         with | ex -> Error ex
 
-    let executeScalarAsync (props: SqlProps) : Async<Sql> =
-      task {
-        if List.isEmpty props.SqlQuery then failwith "No query provided to execute..."
-        use connection = new NpgsqlConnection(props.ConnectionString)
-        do! connection.OpenAsync()
-        use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
-        do populateCmd command props
-        let! value = command.ExecuteScalarAsync()
-        return readValue value
-      }
-      |> Async.AwaitTask
+    let executeScalarTask (props: SqlProps) =
+        task {
+            if List.isEmpty props.SqlQuery then failwith "No query provided to execute..."
+            use connection = new NpgsqlConnection(props.ConnectionString)
+            do! connection.OpenAsync()
+            use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
+            do populateCmd command props
+            let! value = command.ExecuteScalarAsync()
+            return readValue value
+        }
+
+    let executeScalarAsync (props: SqlProps) =
+        executeScalarTask props
+        |> Async.AwaitTask
 
 
-    let executeScalarSafeAsync (props: SqlProps) : Async<Result<Sql, exn>> =
-      task {
-        try
-          if List.isEmpty props.SqlQuery then failwith "No query provided to execute..."
-          use connection = new NpgsqlConnection(props.ConnectionString)
-          do! connection.OpenAsync()
-          use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
-          do populateCmd command props
-          let! value = command.ExecuteScalarAsync()
-          return Ok (readValue value)
-        with
-          | ex -> return Error ex
-      }
-      |> Async.AwaitTask
+    let executeScalarSafeTask (props: SqlProps) =
+        task {
+            try
+                if List.isEmpty props.SqlQuery then failwith "No query provided to execute..."
+                use connection = new NpgsqlConnection(props.ConnectionString)
+                do! connection.OpenAsync()
+                use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
+                do populateCmd command props
+                let! value = command.ExecuteScalarAsync()
+                return Ok (readValue value)
+            with
+            | ex -> return Error ex
+        }
+    let executeScalarSafeAsync (props: SqlProps) =
+        executeScalarSafeTask props
+        |> Async.AwaitTask
 
     let mapEachRow (f: SqlRow -> Option<'a>) (table: SqlTable) =
         List.choose f table
