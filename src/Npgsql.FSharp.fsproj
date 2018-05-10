@@ -8,7 +8,7 @@
     <PackageIconUrl></PackageIconUrl>
     <PackageTags>fsharp;postgres;sql;ngpsql</PackageTags>
     <Authors>Zaid Ajaj</Authors>
-    <Version>0.5.0</Version>
+    <Version>0.6.0</Version>
     <TargetFrameworks>netstandard2.0;net461</TargetFrameworks>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>

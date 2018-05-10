@@ -119,7 +119,10 @@ let publish projectPath = fun () ->
     let nugetKey =
         match environVarOrNone "NUGET_KEY" with
         | Some nugetKey -> nugetKey
-        | None -> failwith "The Nuget API key must be set in a NUGET_KEY environmental variable"
+        | None -> 
+            printfn "The Nuget API key must be set in a NUGET_KEY environmental variable"
+            System.Console.Write("Nuget API Key: ") 
+            System.Console.ReadLine()
     let nupkg =
         Directory.GetFiles(projectPath </> "bin" </> "Release")
         |> Seq.head
