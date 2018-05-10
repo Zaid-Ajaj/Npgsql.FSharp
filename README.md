@@ -160,3 +160,12 @@ Sql.executeNonQuerySafeAsync // Async<Result<int, exn>>
 Sql.executeNonQuerySafeTask // Task<Result<int, exn>>
 ```
 
+### To Run tests
+
+Docker must be installed
+
+```cmd
+build(.cmd or sh) StartDatabase
+build RunTests
+build StopDatabase
+```

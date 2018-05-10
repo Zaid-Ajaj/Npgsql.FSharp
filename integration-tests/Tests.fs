@@ -4,28 +4,28 @@ open Npgsql.FSharp
 
 printfn "Running Postgres integration tests"
 
-type User = { 
+type User = {
     UserId : int
     UserName : string
-    Password : string 
+    Password : string
 }
 
-let getEnv (variable :string) = 
+let getEnv (variable :string) =
     let variables = System.Environment.GetEnvironmentVariables()
     variables.Keys
     |> Seq.cast<string>
     |> Seq.map (fun key -> key, variables.[key] |> unbox<string>)
     |> Map.ofSeq
     |> Map.tryFind variable
-    |> function 
+    |> function
         | Some value -> value
         | None -> failwithf "Could not find value for environment varibale %s" variable
 
-let defaultConnection() = 
+let defaultConnection() =
     Sql.host "localhost"
-    |> Sql.username (getEnv "PG_USER")
-    |> Sql.password (getEnv "PG_PASS")
-    |> Sql.database "sample_db"
+    |> Sql.username "postgres" //(getEnv "PG_USER")
+    |> Sql.password "postgres" //(getEnv "PG_PASS")
+    |> Sql.database "dvdrental" //"sample_db"
     |> Sql.str
     |> Sql.connect
 
@@ -35,7 +35,7 @@ defaultConnection()
 |> Sql.mapEachRow (function
     | [ "UserId", Int id
         "UserName", String name
-        "Password", String pass] -> 
+        "Password", String pass] ->
         let user = { UserId = id; UserName = name; Password = pass }
         Some user
     | _ -> None)
@@ -46,7 +46,7 @@ defaultConnection()
 |> Sql.parameters ["username", String "john-doe"]
 |> Sql.executeScalar
 |> Sql.toBool
-|> function 
+|> function
     | true -> printfn "User was found as expected"
     | false -> failwith "Expected results to be true"
 
@@ -55,7 +55,7 @@ defaultConnection()
 |> Sql.parameters ["username", String "non-existent"]
 |> Sql.executeScalar
 |> Sql.toBool
-|> function 
+|> function
     | true -> failwith "Table should not contain this 'non-existent' value"
     | false -> printfn "User was not found as expected"
 
@@ -63,19 +63,19 @@ defaultConnection()
 |> Sql.query "SELECT NOW()"
 |> Sql.executeScalar
 |> Sql.toDateTime
-|> printfn "%A" 
+|> printfn "%A"
 
 let users = "SELECT * FROM \"Users\""
-let usersMetadata = 
+let usersMetadata =
   Sql.multiline
-    ["select column_name, data_type" 
+    ["select column_name, data_type"
      "from information_schema.columns"
      "where table_name = 'Users'"]
 
 defaultConnection()
 |> Sql.queryMany [users; usersMetadata]
 |> Sql.executeMany
-|> List.iter (fun table -> 
+|> List.iter (fun table ->
     printfn "Table:\n%A\n" table)
 
 let sqlQuery = """
@@ -101,7 +101,7 @@ Sql.host "localhost"
 |> printfn "%A"
 
 
-let inputMap = 
+let inputMap =
     ["property", "value from F#"]
     |> Map.ofSeq
 
@@ -109,8 +109,8 @@ defaultConnection()
 |> Sql.query "select @map"
 |> Sql.parameters ["map", HStore inputMap]
 |> Sql.executeScalar
-|> function 
-    | HStore map -> 
+|> function
+    | HStore map ->
         match Map.tryFind "property" map with
         | Some "value from F#" -> "Mapping HStore works"
         | otherwise -> "Something went wrong when reading HStore"
@@ -118,7 +118,7 @@ defaultConnection()
 |> printfn "%A"
 
 
-let bytesInput = 
+let bytesInput =
     [1 .. 5]
     |> List.map byte
     |> Array.ofList
@@ -128,7 +128,7 @@ defaultConnection()
 |> Sql.parameters [ "manyBytes", Bytea bytesInput ]
 |> Sql.executeScalar
 |> function
-    | Bytea output -> if (output <> bytesInput) 
+    | Bytea output -> if (output <> bytesInput)
                       then failwith "Bytea roundtrip failed, the output was different"
                       else printfn "Bytea roundtrip worked"
 
@@ -142,10 +142,10 @@ defaultConnection()
 |> Sql.parameters [ "uuid_input", Uuid guid ]
 |> Sql.executeScalar
 |> function
-    | Uuid output -> if (output.ToString() <> guid.ToString()) 
+    | Uuid output -> if (output.ToString() <> guid.ToString())
                       then failwith "Uuid roundtrip failed, the output was different"
                       else printfn "Uuid roundtrip worked"
-                      
+
     | otherwise -> failwith "Uuid roundtrip failed"
 
 
