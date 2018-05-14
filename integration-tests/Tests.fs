@@ -2,6 +2,7 @@ module Main
 
 open Npgsql.FSharp
 
+
 printfn "Running Postgres integration tests"
 
 type Actor = {
@@ -19,8 +20,32 @@ let defaultConnection() =
     |> Sql.str
     |> Sql.connect
 
+let handleInfinityConnection() =
+    Sql.host "localhost"
+    |> Sql.username "postgres" //(getEnv "PG_USER")
+    |> Sql.password "postgres" //(getEnv "PG_PASS")
+    |> Sql.database "dvdrental" //"sample_db"
+    |> Sql.config "Convert Infinity DateTime=true;"
+    |> Sql.str
+    |> Sql.connect
+
 defaultConnection()
 |> Sql.query "SELECT * FROM \"actor\""
+|> Sql.executeTable
+|> Sql.mapEachRow (function
+    | [ "Id", Int id
+        "UserName", String first_name
+        "Password", String last_name
+        "LastUpdate", Date last_update] ->
+        let user = { Id = id; FirstName = first_name; LastName = last_name; LastUpdate = last_update }
+        Some user
+    | _ -> None)
+|> List.iter (fun user -> printfn "User %s %s was found" user.FirstName user.LastName)
+
+
+defaultConnection()
+|> Sql.query "SELECT * FROM \"actor\""
+|> Sql.prepare
 |> Sql.executeTable
 |> Sql.mapEachRow (function
     | [ "Id", Int id
@@ -39,6 +64,7 @@ defaultConnection()
 |> function
     | Int 1 -> printfn "Film in stock as expected"
     | _ -> failwith "Expected result to be 1"
+
 
 defaultConnection()
 |> Sql.func "film_in_stock"
@@ -166,3 +192,36 @@ defaultConnection()
 |> function
     | Uuid output -> printfn "Uuid generated: %A" output
     | _ -> failwith "Uuid could not be read failed"
+
+defaultConnection()
+|> Sql.query "CREATE TABLE IF NOT EXISTS data (version integer, date1 timestamptz, date2 timestamptz) "
+|> Sql.executeNonQuery
+|> printfn "Create Table data returned %A"
+
+let delete = "DELETE from data"
+let insert = "INSERT INTO data (version, date1, date2) values (1, 'now', 'infinity')"
+
+defaultConnection()
+|> Sql.queryMany [ delete; insert ]
+|> Sql.executeMany
+|> printfn "Insert into Table data returned %A"
+
+defaultConnection()
+|> Sql.query "SELECT * FROM data"
+|> Sql.executeTableSafe
+|> function
+    | Ok _ -> failwith "Should be able to convert infinity to datetime"
+    | Error ex -> printfn "Fails as expected with %A" ex.Message
+
+handleInfinityConnection()
+|> Sql.query "SELECT * FROM data"
+|> Sql.executeTableSafe
+|> function
+    | Ok r -> printfn "Succeed as expected : %A vs %A" (r.Head.Item 2) System.DateTime.MaxValue
+    | Error _ -> failwith "Should not fail"
+
+
+defaultConnection()
+|> Sql.query "DROP TABLE data"
+|> Sql.executeNonQuery
+|> printfn "Drop Table data returned %A"

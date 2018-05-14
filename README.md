@@ -38,6 +38,7 @@ let defaultConnection : string =
     |> Sql.username "user"
     |> Sql.password "password"
     |> Sql.database "app_db"
+    |> Sql.config "SslMode=Require;" // optional Config for connection string
     |> Sql.str
 ```
 
@@ -91,6 +92,7 @@ defaultConnection
     [ "bookId", Int 20
       "title", String "Lord of the rings"
       "attributes", HStore bookAttributes ]
+|> Sql.prepare       // optionnal, see http://www.npgsql.org/doc/prepare.html
 |> Sql.executeNonQuery
 ```
 ### Retrieve single value safely

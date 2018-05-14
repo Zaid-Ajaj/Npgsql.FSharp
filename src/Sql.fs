@@ -35,6 +35,7 @@ module Sql =
         Username: string
         Password: string
         Port: int
+        Config : string
     }
 
 
@@ -43,6 +44,7 @@ module Sql =
         SqlQuery : string list
         Parameters : SqlRow
         IsFunction : bool
+        NeedPrepare : bool
     }
 
     let private defaultConString() : ConnectionStringBuilder = {
@@ -51,12 +53,14 @@ module Sql =
             Username = ""
             Password = ""
             Port = 5432
+            Config = ""
     }
     let private defaultProps() = {
         ConnectionString = "";
         SqlQuery = [];
         Parameters = [];
         IsFunction = false
+        NeedPrepare = false
     }
 
     let connect constr  = { defaultProps() with ConnectionString = constr }
@@ -65,16 +69,19 @@ module Sql =
     let password x con = { con with Password = x }
     let database x con = { con with Database = x }
     let port n con = { con with Port = n }
+    let config x con = { con with Config = x }
     let str (con:ConnectionStringBuilder) =
-        sprintf "Host=%s;Username=%s;Password=%s;Database=%s;Port=%d"
+        sprintf "Host=%s;Username=%s;Password=%s;Database=%s;Port=%d;%s"
             con.Host
             con.Username
             con.Password
             con.Database
             con.Port
+            con.Config
 
     let query (sql: string) props = { props with SqlQuery = [sql] }
     let func (sql: string) props = { props with SqlQuery = [sql]; IsFunction = true }
+    let prepare  props = { props with NeedPrepare = true}
     let queryMany queries props = { props with SqlQuery = queries }
     let parameters ls props = { props with Parameters = ls }
 
@@ -203,6 +210,7 @@ module Sql =
         use connection = new NpgsqlConnection(props.ConnectionString)
         connection.Open()
         use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
+        if props.NeedPrepare then command.Prepare()
         populateCmd command props
         use reader = command.ExecuteReader()
         readTable reader
@@ -217,6 +225,7 @@ module Sql =
             use connection = new NpgsqlConnection(props.ConnectionString)
             do! connection.OpenAsync()
             use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
+            if props.NeedPrepare then command.Prepare()
             do populateCmd command props
             use! reader = command.ExecuteReaderAsync()
             return! readTableTask (reader |> unbox<NpgsqlDataReader>)
@@ -233,6 +242,7 @@ module Sql =
                 use connection = new NpgsqlConnection(props.ConnectionString)
                 do! connection.OpenAsync()
                 use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
+                if props.NeedPrepare then command.Prepare()
                 do populateCmd command props
                 use! reader = command.ExecuteReaderAsync()
                 let! result = readTableTask (reader |> unbox<NpgsqlDataReader>)
@@ -254,6 +264,7 @@ module Sql =
         use connection = new NpgsqlConnection(props.ConnectionString)
         connection.Open()
         use command = new NpgsqlCommand(singleQuery, connection)
+        if props.NeedPrepare then command.Prepare()
         populateCmd command props
         use reader = command.ExecuteReader()
         [ for _ in 1 .. queryCount do
@@ -265,6 +276,7 @@ module Sql =
         use connection = new NpgsqlConnection(props.ConnectionString)
         connection.Open()
         use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
+        if props.NeedPrepare then command.Prepare()
         populateCmd command props
         command.ExecuteScalar()
         |> readValue
@@ -274,6 +286,7 @@ module Sql =
         use connection = new NpgsqlConnection(props.ConnectionString)
         connection.Open()
         use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
+        if props.NeedPrepare then command.Prepare()
         populateCmd command props
         command.ExecuteNonQuery()
 
@@ -286,6 +299,7 @@ module Sql =
             use connection = new NpgsqlConnection(props.ConnectionString)
             do! connection.OpenAsync()
             use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
+            if props.NeedPrepare then command.Prepare()
             do populateCmd command props
             return! command.ExecuteNonQueryAsync()
         }
@@ -300,6 +314,7 @@ module Sql =
                 use connection = new NpgsqlConnection(props.ConnectionString)
                 do! connection.OpenAsync()
                 use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
+                if props.NeedPrepare then command.Prepare()
                 do populateCmd command props
                 let! result = command.ExecuteNonQueryAsync()
                 return Ok (result)
@@ -321,6 +336,7 @@ module Sql =
             use connection = new NpgsqlConnection(props.ConnectionString)
             do! connection.OpenAsync()
             use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
+            if props.NeedPrepare then command.Prepare()
             do populateCmd command props
             let! value = command.ExecuteScalarAsync()
             return readValue value
@@ -338,6 +354,7 @@ module Sql =
                 use connection = new NpgsqlConnection(props.ConnectionString)
                 do! connection.OpenAsync()
                 use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
+                if props.NeedPrepare then command.Prepare()
                 do populateCmd command props
                 let! value = command.ExecuteScalarAsync()
                 return Ok (readValue value)
