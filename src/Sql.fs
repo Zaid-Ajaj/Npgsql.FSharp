@@ -7,6 +7,14 @@ open System.Data
 open System.Collections.Generic
 open FSharp.Control.Tasks
 
+open System.Reflection
+open Microsoft.FSharp.Reflection
+
+module internal Utils =
+    let isOption (p:PropertyInfo) = 
+        p.PropertyType.IsGenericType &&
+        p.PropertyType.GetGenericTypeDefinition() = typedefof<Option<_>>
+
 type Sql =
     | Short of int16
     | Int of int
@@ -21,6 +29,36 @@ type Sql =
     | Uuid of Guid
     | Null
     | Other of obj
+    with
+        static member toObj = function
+            | Short s -> box s
+            | Int i -> box i
+            | Long l -> box l
+            | String s -> box s
+            | Date dt -> box dt
+            | Bool b -> box b
+            | Number d -> box d
+            | Decimal d -> box d
+            | Bytea b -> box b
+            | HStore hs -> box hs
+            | Uuid g -> box g
+            | Null -> null
+            | Other o -> o
+
+        static member toOptionObj = function
+            | Short s -> box <| Some s
+            | Int i -> box <| Some i
+            | Long l -> box <| Some l
+            | String s -> box <| Some s
+            | Date dt -> box <| Some dt
+            | Bool b -> box <| Some b
+            | Number d -> box <| Some d
+            | Decimal d -> box <| Some d
+            | Bytea b -> box <| Some b
+            | HStore hs -> box <| Some hs
+            | Uuid g -> box <| Some g
+            | Null -> box None
+            | Other o -> box <| Some o
 
 type SqlRow = list<string * Sql>
 
@@ -367,3 +405,24 @@ module Sql =
 
     let mapEachRow (f: SqlRow -> Option<'a>) (table: SqlTable) =
         List.choose f table
+
+    let parseRow<'a> (row : SqlRow) = 
+        let findRowValue isOptional name row =
+            match isOptional, List.tryFind (fun (n, _) -> n = name) row with
+            | false, None -> failwithf "Missing parameter: %s" name
+            | false, Some (_, x) -> Sql.toObj x
+            | true, None -> box None
+            | true, Some (_, x) -> Sql.toOptionObj x
+
+        if FSharpType.IsRecord typeof<'a>
+            then
+                let args =
+                    FSharpType.GetRecordFields typeof<'a>
+                    |> Array.map (fun pi -> row |> findRowValue (Utils.isOption pi) pi.Name)
+                Some <| (FSharpValue.MakeRecord(typeof<'a>, args) :?> 'a)
+            else None
+
+    let parseEachRow<'a> =
+        mapEachRow parseRow<'a>
+
+    
