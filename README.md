@@ -66,6 +66,38 @@ let getAllUsers() : User list =
           Some user
         | _ -> None)
 ```
+
+You can also try automated parsing:
+
+```fs
+type User = {
+    UserId : int
+    FirstName: string
+    LastName: string
+}
+
+let getAllUsers() : User list =
+    defaultConnection
+    |> Sql.connect
+    |> Sql.query "SELECT * FROM \"users\""
+    |> Sql.executeTable // SqlTable
+    |> Sql.parseEachRow<User>
+```
+
+Though watch out, as this is a relatively new feature and still needs some time and love:
+* The type parameter must be a record.
+* Fields' names must match exactly columns headers.
+* Only simple types are supported (see the definition of the "Sql" type).
+* You can turn a field into an option if it's defined as "Nullable" in your table:
+```
+type User = {
+    UserId : int
+    FirstName : string
+    LastName : string
+    Nickname : string option
+}
+```
+
 ### Execute a function with parameters
 ```fs
 /// Check whether or not a user exists by his username
