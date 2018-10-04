@@ -1,6 +1,6 @@
 # Npgsql.FSharp [![Nuget](https://img.shields.io/nuget/v/Npgsql.FSharp.svg?colorB=green)](https://www.nuget.org/packages/Npgsql.FSharp)
 
-Thin F# wrapper for [Npqsql](https://github.com/npgsql/npgsql), data provider for PostgreSQL.
+Thin F# wrapper for [Npgsql](https://github.com/npgsql/npgsql), data provider for PostgreSQL.
 
 This wrapper maps *raw* SQL data from the database into the `Sql` data structure making it easy to pattern match against and transform the results.
 
@@ -29,7 +29,7 @@ type SqlTable = list<SqlRow>
 ```
 ### Configure the connection string
 ```fs
-open Npqsql.FSharp
+open Npgsql.FSharp
 
 // construct the connection string
 let defaultConnection : string =
