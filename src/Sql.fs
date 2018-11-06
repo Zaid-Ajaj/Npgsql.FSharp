@@ -15,54 +15,26 @@ module internal Utils =
         p.PropertyType.IsGenericType &&
         p.PropertyType.GetGenericTypeDefinition() = typedefof<Option<_>>
 
-type Sql =
-    | Short of int16
-    | Int of int
-    | Long of int64
-    | String of string
-    | Date of DateTime
-    | Bool of bool
-    | Number of double
-    | Decimal of decimal
-    | Bytea of byte[]
-    | HStore of Map<string, string>
-    | Uuid of Guid
-    | Null
-    | Other of obj
-    with
-        static member toObj = function
-            | Short s -> box s
-            | Int i -> box i
-            | Long l -> box l
-            | String s -> box s
-            | Date dt -> box dt
-            | Bool b -> box b
-            | Number d -> box d
-            | Decimal d -> box d
-            | Bytea b -> box b
-            | HStore hs -> box hs
-            | Uuid g -> box g
-            | Null -> null
-            | Other o -> o
+module Async = 
+    let map f comp = 
+        async {
+            let! result = comp 
+            return f result
+        }
 
-        static member toOptionObj = function
-            | Short s -> box <| Some s
-            | Int i -> box <| Some i
-            | Long l -> box <| Some l
-            | String s -> box <| Some s
-            | Date dt -> box <| Some dt
-            | Bool b -> box <| Some b
-            | Number d -> box <| Some d
-            | Decimal d -> box <| Some d
-            | Bytea b -> box <| Some b
-            | HStore hs -> box <| Some hs
-            | Uuid g -> box <| Some g
-            | Null -> box None
-            | Other o -> box <| Some o
-
-type SqlRow = list<string * Sql>
-
-type SqlTable = list<SqlRow>
+type Sql() = 
+    static member Value(value: int) = SqlValue.Int value
+    static member Value(value: string) = SqlValue.String value 
+    static member Value(value: int16) = SqlValue.Short value
+    static member Value(value: double) = SqlValue.Number value
+    static member Value(value: decimal) = SqlValue.Decimal value 
+    static member Value(value: int64) = SqlValue.Long value 
+    static member Value(value: DateTime) = SqlValue.Date value 
+    static member Value(value: bool) = SqlValue.Bool value 
+    static member Value(value: DateTimeOffset) = SqlValue.TimeWithTimeZone value    
+    static member Value(value: Guid) = SqlValue.Uuid value
+    static member Value(bytea: byte[]) = SqlValue.Bytea bytea
+    static member Value(map: Map<string, string>) = SqlValue.HStore map  
 
 [<RequireQualifiedAccess>]
 module Sql =
@@ -123,67 +95,201 @@ module Sql =
     let queryMany queries props = { props with SqlQuery = queries }
     let parameters ls props = { props with Parameters = ls }
 
+    let readInt name (row: SqlRow) =    
+        row
+        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> Option.map snd 
+        |> function 
+            | Some (SqlValue.Int value) -> Some value 
+            | _ -> None 
+
+    let readString name (row: SqlRow) =    
+        row
+        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> Option.map snd 
+        |> function 
+            | Some (SqlValue.String value) -> Some value 
+            | _ -> None 
+
+    let readDate name (row: SqlRow) =    
+        row
+        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> Option.map snd 
+        |> function 
+            | Some (SqlValue.Date value) -> Some value 
+            | _ -> None 
+
+    let readBool name (row: SqlRow) =    
+        row
+        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> Option.map snd 
+        |> function 
+            | Some (SqlValue.Bool value) -> Some value 
+            | _ -> None 
+
+    let readDecimal name (row: SqlRow) =    
+        row
+        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> Option.map snd 
+        |> function 
+            | Some (SqlValue.Bool value) -> Some value 
+            | _ -> None 
+
+    let readNumber name (row: SqlRow) =    
+        row
+        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> Option.map snd 
+        |> function 
+            | Some (SqlValue.Number value) -> Some value 
+            | _ -> None 
+
+    let readUuid name (row: SqlRow) =    
+        row
+        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> Option.map snd 
+        |> function 
+            | Some (SqlValue.Uuid value) -> Some value 
+            | _ -> None 
+
+    let readBytea name (row: SqlRow) =    
+        row
+        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> Option.map snd 
+        |> function 
+            | Some (SqlValue.Bytea value) -> Some value 
+            | _ -> None 
+
+    let readHStore name (row: SqlRow) =    
+        row
+        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> Option.map snd 
+        |> function 
+            | Some (SqlValue.HStore value) -> Some value 
+            | _ -> None
+
     let toBool = function
-        | Bool x -> x
+        | SqlValue.Bool x -> x
         | value -> failwithf "Could not convert %A into a boolean value" value
 
     let toInt = function
-        | Int x -> x
+        | SqlValue.Int x -> x
         | value -> failwithf "Could not convert %A into an integer" value
 
     let toString = function
-        | String x -> x
+        | SqlValue.String x -> x
         | value -> failwithf "Could not convert %A into a string" value
 
     let toDateTime = function
-        | Date x -> x
+        | SqlValue.Date x -> x
         | value -> failwithf "Could not convert %A into a DateTime" value
 
     let toFloat = function
-        | Number x -> x
+        | SqlValue.Number x -> x
         | value -> failwithf "Could not convert %A into a floating number" value
 
-    let readValue value =
+    let (|NullInt|_|) = function
+        | SqlValue.Null -> None  
+        | SqlValue.Int value -> Some value 
+        | _ -> None
+
+    let (|NullShort|_|) = function
+        | SqlValue.Null -> None  
+        | SqlValue.Short value -> Some value 
+        | _ -> None
+
+    let (|NullLong|_|) = function
+        | SqlValue.Null -> None  
+        | SqlValue.Long value -> Some value 
+        | _ -> None
+
+    let (|NullDate|_|) = function
+        | SqlValue.Null -> None  
+        | SqlValue.Date value -> Some value 
+        | _ -> None
+    
+    let (|NullBool|_|) = function
+        | SqlValue.Null -> None  
+        | SqlValue.Bool value -> Some value 
+        | _ -> None    
+
+    let (|NullTimeWithTimeZone|_|) = function
+        | SqlValue.Null -> None  
+        | SqlValue.TimeWithTimeZone value -> Some value 
+        | _ -> None  
+
+    let (|NullDecimal|_|) = function
+        | SqlValue.Null -> None  
+        | SqlValue.Decimal value -> Some value 
+        | _ -> None  
+
+    let (|NullBytea|_|) = function
+        | SqlValue.Null -> None  
+        | SqlValue.Bytea value -> Some value 
+        | _ -> None  
+
+    let (|NullHStore|_|) = function
+        | SqlValue.Null -> None  
+        | SqlValue.HStore value -> Some value 
+        | _ -> None  
+
+    let (|NullUuid|_|) = function
+        | SqlValue.Null -> None  
+        | SqlValue.Uuid value -> Some value 
+        | _ -> None  
+
+    let (|NullNumber|_|) = function
+        | SqlValue.Null -> None  
+        | SqlValue.Number value -> Some value 
+        | _ -> None  
+
+    let readValue (columnName: Option<string>) value =
         match box value with
-        | :? int32 as x -> Int x
-        | :? string as x -> String x
-        | :? System.DateTime as x -> Date x
-        | :? bool as x ->  Bool x
-        | :? int64 as x ->  Long x
-        | :? decimal as x -> Decimal x
-        | :? double as x ->  Number x
-        | :? System.Guid as x -> Uuid x
-        | :? array<byte> as xs -> Bytea xs
+        | :? int16 as x -> SqlValue.Short x
+        | :? int32 as x -> SqlValue.Int x
+        | :? string as x -> SqlValue.String x
+        | :? System.DateTimeOffset as x -> SqlValue.TimeWithTimeZone x
+        | :? System.DateTime as x -> SqlValue.Date x
+        | :? bool as x ->  SqlValue.Bool x
+        | :? int64 as x ->  SqlValue.Long x
+        | :? decimal as x -> SqlValue.Decimal x
+        | :? double as x ->  SqlValue.Number x
+        | :? System.Guid as x -> SqlValue.Uuid x
+        | :? array<byte> as xs -> SqlValue.Bytea xs
         | :? IDictionary<string, string> as dict ->
             dict
             |> Seq.map (|KeyValue|)
             |> Map.ofSeq
-            |> HStore
-        | null -> Null
-        | _ -> Other value
-
+            |> SqlValue.HStore
+        | null -> SqlValue.Null
+        | :? System.DBNull -> SqlValue.Null
+        | other -> 
+            let typeName = (other.GetType()).FullName
+            match columnName with 
+            | Some name -> failwithf "Unable to read column '%s' of type '%s'" name typeName
+            | None -> failwithf "Unable to read column of type '%s'" typeName
+    
+    /// Reads a single row from the data reader synchronously
     let readRow (reader : NpgsqlDataReader) : SqlRow =
-
         let readFieldSync fieldIndex =
-
             let fieldName = reader.GetName(fieldIndex)
             if reader.IsDBNull(fieldIndex)
-            then fieldName, Null
-            else fieldName, readValue (reader.GetFieldValue(fieldIndex))
+            then fieldName, SqlValue.Null
+            else fieldName, readValue (Some fieldName) (reader.GetFieldValue(fieldIndex))
 
         [0 .. reader.FieldCount - 1]
         |> List.map readFieldSync
 
+    /// Reads a single row from the data reader asynchronously
     let readRowTask (reader: NpgsqlDataReader) =
         let readValueTask fieldIndex =
           task {
               let fieldName = reader.GetName fieldIndex
               let! isNull = reader.IsDBNullAsync fieldIndex
               if isNull then
-                return fieldName, Null
+                return fieldName, SqlValue.Null
               else
                 let! value = reader.GetFieldValueAsync fieldIndex
-                return fieldName, readValue value
+                return fieldName, readValue (Some fieldName) value
           }
 
         [0 .. reader.FieldCount - 1]
@@ -193,7 +299,6 @@ module Sql =
     let readRowAsync (reader: NpgsqlDataReader) =
         readRowTask reader
         |> Async.AwaitTask
-
 
     let readTable (reader: NpgsqlDataReader) : SqlTable =
         [ while reader.Read() do yield readRow reader ]
@@ -216,35 +321,38 @@ module Sql =
     let private populateCmd (cmd: NpgsqlCommand) (props: SqlProps) =
         if props.IsFunction then cmd.CommandType <- CommandType.StoredProcedure
 
-        for param in props.Parameters do
+        for (paramName, value) in props.Parameters do
           let paramValue : obj =
-            match snd param with
-            | String text -> upcast text
-            | Int i -> upcast i
-            | Uuid x -> upcast x
-            | Short x -> upcast x
-            | Date date -> upcast date
-            | Number n -> upcast n
-            | Bool b -> upcast b
-            | Decimal x -> upcast x
-            | Long x -> upcast x
-            | Bytea x -> upcast x
-            | HStore dictionary ->
+            match value with
+            | SqlValue.String text -> upcast text
+            | SqlValue.Int i -> upcast i
+            | SqlValue.Uuid x -> upcast x
+            | SqlValue.Short x -> upcast x
+            | SqlValue.Date date -> upcast date
+            | SqlValue.Number n -> upcast n
+            | SqlValue.Bool b -> upcast b
+            | SqlValue.Decimal x -> upcast x
+            | SqlValue.Long x -> upcast x
+            | SqlValue.Bytea x -> upcast x
+            | SqlValue.TimeWithTimeZone x -> upcast x 
+            | SqlValue.Null -> upcast System.DBNull.Value
+            | SqlValue.HStore dictionary ->
                 let value =
                   dictionary
                   |> Map.toList
                   |> dict
                   |> Dictionary
                 upcast value
-            | Null -> null
-            | Other x -> x
 
+          let paramName = 
+            if not (paramName.StartsWith "@")
+            then sprintf "@%s" paramName 
+            else paramName
 
-          let paramName = sprintf "@%s" (fst param)
           cmd.Parameters.AddWithValue(paramName, paramValue) |> ignore
 
     let executeTable (props: SqlProps) : SqlTable =
-        if List.isEmpty props.SqlQuery then failwith "No query provided to execute..."
+        if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
         use connection = new NpgsqlConnection(props.ConnectionString)
         connection.Open()
         use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
@@ -259,7 +367,7 @@ module Sql =
 
     let executeTableTask (props: SqlProps) =
         task {
-            if List.isEmpty props.SqlQuery then failwith "No query provided to execute..."
+            if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
             use connection = new NpgsqlConnection(props.ConnectionString)
             do! connection.OpenAsync()
             use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
@@ -269,14 +377,14 @@ module Sql =
             return! readTableTask (reader |> unbox<NpgsqlDataReader>)
         }
 
-    let executeTableAsync (props: SqlProps) =
+    let executeTableAsync (props: SqlProps) : Async<SqlTable> =
         executeTableTask props
         |> Async.AwaitTask
-
-    let executeTableSafeTask (props: SqlProps) =
+ 
+    let executeTableSafeTask (props: SqlProps) : Task<Result<SqlTable, exn>> =
         task {
             try
-                if List.isEmpty props.SqlQuery then failwith "No query provided to execute..."
+                if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
                 use connection = new NpgsqlConnection(props.ConnectionString)
                 do! connection.OpenAsync()
                 use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
@@ -289,14 +397,45 @@ module Sql =
             | ex -> return Error ex
         }
 
-    let executeTableSafeAsync (props: SqlProps) =
+    let executeTableSafeAsync (props: SqlProps) : Async<Result<SqlTable, exn>> =
         executeTableSafeTask props
         |> Async.AwaitTask
+ 
+    let private valueAsObject = function
+    | SqlValue.Short s -> box s
+    | SqlValue.Int i -> box i
+    | SqlValue.Long l -> box l
+    | SqlValue.String s -> box s
+    | SqlValue.Date dt -> box dt
+    | SqlValue.Bool b -> box b
+    | SqlValue.Number d -> box d
+    | SqlValue.Decimal d -> box d
+    | SqlValue.Bytea b -> box b
+    | SqlValue.HStore hs -> box hs
+    | SqlValue.Uuid g -> box g
+    | SqlValue.TimeWithTimeZone g -> box g
+    | SqlValue.Null -> null
+
+    let private valueAsOptionalObject = function
+    | SqlValue.Short value -> box (Some value)
+    | SqlValue.Int value -> box (Some value)
+    | SqlValue.Long value -> box (Some value)
+    | SqlValue.String value -> box (Some value)
+    | SqlValue.Date value -> box (Some value)
+    | SqlValue.Bool value -> box (Some value)
+    | SqlValue.Number value -> box (Some value)
+    | SqlValue.Decimal value -> box (Some value)
+    | SqlValue.Bytea value -> box (Some value)
+    | SqlValue.HStore value -> box (Some value)
+    | SqlValue.Uuid value -> box (Some value)
+    | SqlValue.TimeWithTimeZone value -> box (Some value)
+    | SqlValue.Null -> box (Some null)
 
     let multiline xs = String.concat Environment.NewLine xs
 
+    /// Executes multiple queries and returns each result set as a distinct table
     let executeMany (props: SqlProps)  =
-        if List.isEmpty props.SqlQuery then failwith "No query provided to execute..."
+        if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
         let queryCount = List.length props.SqlQuery
         let singleQuery = String.concat ";" props.SqlQuery
         use connection = new NpgsqlConnection(props.ConnectionString)
@@ -309,16 +448,17 @@ module Sql =
             yield readTable reader
             reader.NextResult() |> ignore ]
 
-    let executeScalar (props: SqlProps) : Sql =
-        if List.isEmpty props.SqlQuery then failwith "No query provided to execute..."
+    let executeScalar (props: SqlProps) : SqlValue =
+        if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
         use connection = new NpgsqlConnection(props.ConnectionString)
         connection.Open()
         use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
         if props.NeedPrepare then command.Prepare()
         populateCmd command props
         command.ExecuteScalar()
-        |> readValue
-
+        |> readValue None
+ 
+    /// Executes the query and returns the number of rows affected
     let executeNonQuery (props: SqlProps) : int =
         if List.isEmpty props.SqlQuery then failwith "No query provided to execute..."
         use connection = new NpgsqlConnection(props.ConnectionString)
@@ -328,10 +468,12 @@ module Sql =
         populateCmd command props
         command.ExecuteNonQuery()
 
+    /// Executes the query safely (does not throw) and returns the number of rows affected
     let executeNonQuerySafe (props: SqlProps) : Result<int, exn> =
         try Ok (executeNonQuery props)
         with | ex -> Error ex
 
+    /// Executes the query as a task and returns the number of rows affected
     let executeNonQueryTask (props: SqlProps) =
         task {
             use connection = new NpgsqlConnection(props.ConnectionString)
@@ -342,10 +484,12 @@ module Sql =
             return! command.ExecuteNonQueryAsync()
         }
 
+    /// Executes the query as asynchronously and returns the number of rows affected
     let executeNonQueryAsync  (props: SqlProps) =
         executeNonQueryTask props
         |> Async.AwaitTask
 
+    /// Executes the query safely as task (does not throw) and returns the number of rows affected
     let executeNonQuerySafeTask (props: SqlProps) =
         task {
             try
@@ -360,13 +504,16 @@ module Sql =
             | ex -> return Error ex
         }
 
+    /// Executes the query safely asynchronously (does not throw) and returns the number of rows affected
     let executeNonQuerySafeAsync (props: SqlProps) =
         executeNonQuerySafeTask props
         |> Async.AwaitTask
 
-    let executeScalarSafe (props: SqlProps) : Result<Sql, exn> =
+    /// Executes the query and returns a scalar value safely (does not throw)
+    let executeScalarSafe (props: SqlProps) =
         try  Ok (executeScalar props)
         with | ex -> Error ex
+
 
     let executeScalarTask (props: SqlProps) =
         task {
@@ -377,7 +524,7 @@ module Sql =
             if props.NeedPrepare then command.Prepare()
             do populateCmd command props
             let! value = command.ExecuteScalarAsync()
-            return readValue value
+            return readValue None value
         }
 
     let executeScalarAsync (props: SqlProps) =
@@ -395,7 +542,7 @@ module Sql =
                 if props.NeedPrepare then command.Prepare()
                 do populateCmd command props
                 let! value = command.ExecuteScalarAsync()
-                return Ok (readValue value)
+                return Ok (readValue None value)
             with
             | ex -> return Error ex
         }
@@ -410,19 +557,17 @@ module Sql =
         let findRowValue isOptional name row =
             match isOptional, List.tryFind (fun (n, _) -> n = name) row with
             | false, None -> failwithf "Missing parameter: %s" name
-            | false, Some (_, x) -> Sql.toObj x
+            | false, Some (_, x) -> valueAsObject x
             | true, None -> box None
-            | true, Some (_, x) -> Sql.toOptionObj x
+            | true, Some (_, x) -> valueAsOptionalObject x
 
         if FSharpType.IsRecord typeof<'a>
             then
                 let args =
                     FSharpType.GetRecordFields typeof<'a>
-                    |> Array.map (fun pi -> row |> findRowValue (Utils.isOption pi) pi.Name)
+                    |> Array.map (fun propInfo ->  findRowValue (Utils.isOption propInfo) propInfo.Name row)
                 Some <| (FSharpValue.MakeRecord(typeof<'a>, args) :?> 'a)
             else None
 
     let parseEachRow<'a> =
         mapEachRow parseRow<'a>
-
-    

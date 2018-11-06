@@ -6,7 +6,7 @@ This wrapper maps *raw* SQL data from the database into the `Sql` data structure
 
 Given the types:
 ```fs
-type Sql =
+type SqlValue =
     | Short of int16
     | Int of int
     | Long of int64
@@ -18,11 +18,11 @@ type Sql =
     | Bytea of byte[]
     | HStore of Map<string, string>
     | Uuid of Guid
+    | TimeWithTimeZone of DateTimeOffset
     | Null
-    | Other of obj
 
 // A row is a list of key/value pairs
-type SqlRow = list<string * Sql>
+type SqlRow = list<string * SqlValue>
 
 // A table is list of rows
 type SqlTable = list<SqlRow>
@@ -54,11 +54,11 @@ let getAllUsers() : User list =
     defaultConnection
     |> Sql.connect
     |> Sql.query "SELECT * FROM \"users\""
-    |> Sql.executeTable // SqlTable
+    |> Sql.executeTable
     |> Sql.mapEachRow (function
-        | [ "user_id", Int id
-            "first_name", String fname
-            "last_name", String lname ] ->
+        | [ "user_id", SqlValue.Int id
+            "first_name", SqlValue.String fname
+            "last_name", SqlValue.String lname ] ->
           let user =
             { UserId = id;
               FirstName = fname;
@@ -66,38 +66,52 @@ let getAllUsers() : User list =
           Some user
         | _ -> None)
 ```
-
-You can also try automated parsing:
-
+### Use option monad for reading row values:
 ```fs
-type User = {
-    UserId : int
-    FirstName: string
-    LastName: string
-}
-
 let getAllUsers() : User list =
     defaultConnection
     |> Sql.connect
     |> Sql.query "SELECT * FROM \"users\""
-    |> Sql.executeTable // SqlTable
-    |> Sql.parseEachRow<User>
+    |> Sql.executeTable 
+    |> Sql.mapEachRow (fun row ->
+        option {
+            let! id = Sql.readInt "user_id" row 
+            let! fname = Sql.readString "first_name" row 
+            let! lname = Sql.readString "last_name" row
+            return { Id = id; FirstName = fname; LastName = lname }
+        }) 
 ```
+### Deal with null values and provide defaults
+Notice we are not using `let bang` but just `let` instead
 
-Though watch out, as this is a relatively new feature and still needs some time and love:
-* The type parameter must be a record.
-* Fields' names must match exactly columns headers.
-* Only simple types are supported (see the definition of the "Sql" type).
-* You can turn a field into an option if it's defined as "Nullable" in your table:
+```fs
+let getAllUsers() : User list =
+    defaultConnection
+    |> Sql.connect
+    |> Sql.query "SELECT * FROM \"users\""
+    |> Sql.executeTable 
+    |> Sql.mapEachRow (fun row ->
+        option {
+            let! id = Sql.readInt "user_id" row 
+            let fname = Sql.readString "first_name" row 
+            let lname = Sql.readString "last_name" row
+            return { 
+                Id = id; 
+                FirstName = defaultArg fname ""  
+                LastName = defaultArg lname "" 
+            }
+        }) 
 ```
-type User = {
-    UserId : int
-    FirstName : string
-    LastName : string
-    Nickname : string option
-}
-```
+the library doesn't provide an `option` monad by default, you add your own or use this simple one instead:
+```fs
+type OptionBuilder() =
+    member x.Bind(v,f) = Option.bind f v
+    member x.Return v = Some v
+    member x.ReturnFrom o = o
+    member x.Zero () = None
 
+let option = OptionBuilder()
+```
 ### Execute a function with parameters
 ```fs
 /// Check whether or not a user exists by his username
@@ -105,10 +119,24 @@ let userExists (name: string) : bool =
     defaultConnection
     |> Sql.connect
     |> Sql.func "user_exists"
-    |> Sql.parameters ["username", String name]
-    |> Sql.executeScalar // Sql
+    |> Sql.parameters ["username", SqlValue.String name]
+    |> Sql.executeScalar // SqlValue
     |> Sql.toBool
 ```
+
+### Async: Execute a function with parameters
+```fs
+/// Check whether or not a user exists by his username
+let userExists (name: string) : Async<bool> =
+    defaultConnection
+    |> Sql.connect
+    |> Sql.func "user_exists"
+    |> Sql.parameters ["username", Sql.Value name]
+    |> Sql.executeScalarAsync
+    |> Async.map Sql.toBool
+```
+
+
 ### Parameterize queries with complex parameters like hstore
 ```fs
 // Insert a book with it's attributes stored as HStore values
@@ -121,9 +149,9 @@ let bookAttributes =
 defaultConnection
 |> Sql.query "INSERT INTO \"books\" (id,title,attrs) VALUES (@bookId,@title,@attributes)"
 |> Sql.parameters
-    [ "bookId", Int 20
-      "title", String "Lord of the rings"
-      "attributes", HStore bookAttributes ]
+    [ "bookId", Sql.Value 20
+      "title", Sql.Value "Lord of the rings"
+      "attributes", Sql.Value bookAttributes ]
 |> Sql.prepare       // optionnal, see http://www.npgsql.org/doc/prepare.html
 |> Sql.executeNonQuery
 ```
@@ -136,7 +164,7 @@ let serverTime() : Option<DateTime> =
     |> Sql.query "SELECT NOW()"
     |> Sql.executeScalarSafe
     |> function
-        | Ok (Date time) -> Some time
+        | Ok (SqlValue.Date time) -> Some time
         | _ -> None
 ```
 ### Retrieve single value safely asynchronously
@@ -151,7 +179,7 @@ let serverTime() : Async<Option<DateTime>> =
           |> Sql.executeScalarSafeAsync
 
         match result with
-        | Ok (Date time) -> return Some time
+        | Ok (SqlValue.Date time) -> return Some time
         | otherwise -> return None
     }
 ```
@@ -193,6 +221,38 @@ Sql.executeNonQuerySafe // Result<int, exn>
 Sql.executeNonQuerySafeAsync // Async<Result<int, exn>>
 Sql.executeNonQuerySafeTask // Task<Result<int, exn>>
 ```
+
+You can also try automated parsing:
+
+```fs
+type User = {
+    UserId : int
+    FirstName: string
+    LastName: string
+}
+
+let getAllUsers() : User list =
+    defaultConnection
+    |> Sql.connect
+    |> Sql.query "SELECT * FROM \"users\""
+    |> Sql.executeTable // SqlTable
+    |> Sql.parseEachRow<User>
+```
+
+Though watch out, as this is a relatively new feature and still needs some time and love:
+* The type parameter must be a record.
+* Fields' names must match exactly columns headers.
+* Only simple types are supported (see the definition of the "Sql" type).
+* You can turn a field into an option if it's defined as "Nullable" in your table:
+```
+type User = {
+    UserId : int
+    FirstName : string
+    LastName : string
+    Nickname : string option
+}
+```
+
 
 ### To Run tests
 
