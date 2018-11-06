@@ -8,7 +8,6 @@ let libPath = "./src"
 let testsPath = "./integration-tests"
 let databaseDockerContainerName = "npgsql_fsharp_db"
 let databaseDockerImageName = "npgsql_fsharp_image"
-
 let databasePassword = "postgres"
 
 
@@ -64,7 +63,6 @@ Target "Clean" <| fun _ ->
       libPath </> "bin"
       libPath </> "obj" ]
     |> CleanDirs
-
 
 
 Target "StartDatabase" (fun _ ->
