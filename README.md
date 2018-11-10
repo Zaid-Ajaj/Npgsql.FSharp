@@ -149,9 +149,9 @@ let bookAttributes =
 defaultConnection
 |> Sql.query "INSERT INTO \"books\" (id,title,attrs) VALUES (@bookId,@title,@attributes)"
 |> Sql.parameters
-    [ "bookId", Sql.Value 20
-      "title", Sql.Value "Lord of the rings"
-      "attributes", Sql.Value bookAttributes ]
+    [ "bookId", SqlValue.Int 20
+      "title", SqlValue.String "Lord of the rings"
+      "attributes", SqlValue.HStore bookAttributes ]
 |> Sql.prepare       // optionnal, see http://www.npgsql.org/doc/prepare.html
 |> Sql.executeNonQuery
 ```
