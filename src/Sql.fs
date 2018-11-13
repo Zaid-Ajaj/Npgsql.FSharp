@@ -102,6 +102,14 @@ module Sql =
         |> function 
             | Some (SqlValue.Int value) -> Some value 
             | _ -> None 
+    
+    let readLong name (row: SqlRow)  =
+        row
+        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> Option.map snd 
+        |> function 
+            | Some (SqlValue.Long value) -> Some value 
+            | _ -> None 
 
     let readString name (row: SqlRow) =    
         row
@@ -174,6 +182,10 @@ module Sql =
     let toInt = function
         | SqlValue.Int x -> x
         | value -> failwithf "Could not convert %A into an integer" value
+
+    let toLong = function
+        | SqlValue.Long x -> x
+        | value -> failwithf "Could not convert %A into a long" value
 
     let toString = function
         | SqlValue.String x -> x
