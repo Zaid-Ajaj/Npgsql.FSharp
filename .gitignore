@@ -4,3 +4,4 @@ obj
 paket-files
 .vscode
 .fake
+.ionide
