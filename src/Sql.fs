@@ -141,7 +141,7 @@ module Sql =
         |> List.tryFind (fun (colName, value) -> colName = name)
         |> Option.map snd 
         |> function 
-            | Some (SqlValue.Bool value) -> Some value 
+            | Some (SqlValue.Decimal value) -> Some value 
             | _ -> None 
 
     let readNumber name (row: SqlRow) =    
