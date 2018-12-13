@@ -159,6 +159,25 @@ defaultConnection()
 
 printfn "HStore roundtrip end"
 
+let inputJson = "{\"property\": \"value from F#\"}"
+
+printfn "Jsonb roundtrip start"
+
+defaultConnection()
+|> Sql.connect
+|> Sql.query "select @jsonb"
+|> Sql.parameters ["jsonb", SqlValue.Jsonb inputJson]
+|> Sql.executeScalar
+|> function
+    | SqlValue.Jsonb json ->
+        match inputJson = json with
+        | true -> "Mapping Jsonb works"
+        | _ -> sprintf "Something went wrong when reading Jsonb, expected %s but got %s" inputJson json
+    | x -> sprintf "Something went wrong when mapping Jsonb, %A" x
+|> printfn "%A"
+
+printfn "Jsonb roundtrip end"
+
 // Unhandled Exception: System.NotSupportedException: Npgsql 3.x removed support for writing a parameter with an IEnumerable value, use .ToList()/.ToArray() instead
 // Need to add a NpgsqlTypeHandler for Map ?
 
