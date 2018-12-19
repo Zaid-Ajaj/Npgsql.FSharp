@@ -472,7 +472,7 @@ module Sql =
     | SqlValue.HStore value -> box (Some value)
     | SqlValue.Uuid value -> box (Some value)
     | SqlValue.TimeWithTimeZone value -> box (Some value)
-    | SqlValue.Null -> box (Some null)
+    | SqlValue.Null -> box (None)
 
     let multiline xs = String.concat Environment.NewLine xs
 
@@ -627,9 +627,8 @@ module Sql =
     let parseRow<'a> (row : SqlRow) = 
         let findRowValue isOptional name row =
             match isOptional, List.tryFind (fun (n, _) -> n = name) row with
-            | false, None -> failwithf "Missing parameter: %s" name
+            | _, None -> failwithf "Missing parameter: %s" name
             | false, Some (_, x) -> valueAsObject x
-            | true, None -> box None
             | true, Some (_, x) -> valueAsOptionalObject x
 
         if FSharpType.IsRecord typeof<'a>
