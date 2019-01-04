@@ -169,9 +169,9 @@ defaultConnection()
 |> Sql.parameters ["jsonb", SqlValue.Jsonb inputJson]
 |> Sql.executeScalar
 |> function
-    | SqlValue.Jsonb json ->
+    | SqlValue.String json ->
         match inputJson = json with
-        | true -> "Mapping Jsonb works"
+        | true -> "Mapping Jsonb works, but you have to match SqlValue.String"
         | _ -> sprintf "Something went wrong when reading Jsonb, expected %s but got %s" inputJson json
     | x -> sprintf "Something went wrong when mapping Jsonb, %A" x
 |> printfn "%A"
