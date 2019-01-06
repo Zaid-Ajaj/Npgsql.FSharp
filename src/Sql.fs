@@ -351,34 +351,37 @@ module Sql =
         if props.IsFunction then cmd.CommandType <- CommandType.StoredProcedure
 
         for (paramName, value) in props.Parameters do
-          let paramValue : obj =
+          let paramValue, paramType : (obj * NpgsqlTypes.NpgsqlDbType option) =
             match value with
-            | SqlValue.String text -> upcast text
-            | SqlValue.Int i -> upcast i
-            | SqlValue.Uuid x -> upcast x
-            | SqlValue.Short x -> upcast x
-            | SqlValue.Date date -> upcast date
-            | SqlValue.Number n -> upcast n
-            | SqlValue.Bool b -> upcast b
-            | SqlValue.Decimal x -> upcast x
-            | SqlValue.Long x -> upcast x
-            | SqlValue.Bytea x -> upcast x
-            | SqlValue.TimeWithTimeZone x -> upcast x 
-            | SqlValue.Null -> upcast System.DBNull.Value
+            | SqlValue.String text -> upcast text, None
+            | SqlValue.Int i -> upcast i, None
+            | SqlValue.Uuid x -> upcast x, None
+            | SqlValue.Short x -> upcast x, None
+            | SqlValue.Date date -> upcast date, None
+            | SqlValue.Number n -> upcast n, None
+            | SqlValue.Bool b -> upcast b, None
+            | SqlValue.Decimal x -> upcast x, None
+            | SqlValue.Long x -> upcast x, None
+            | SqlValue.Bytea x -> upcast x, None
+            | SqlValue.TimeWithTimeZone x -> upcast x, None
+            | SqlValue.Null -> upcast System.DBNull.Value, None
             | SqlValue.HStore dictionary ->
                 let value =
                   dictionary
                   |> Map.toList
                   |> dict
                   |> Dictionary
-                upcast value
+                upcast value, None
+            | SqlValue.Jsonb x -> upcast x, Some NpgsqlTypes.NpgsqlDbType.Jsonb
 
           let paramName = 
             if not (paramName.StartsWith "@")
             then sprintf "@%s" paramName 
             else paramName
 
-          cmd.Parameters.AddWithValue(paramName, paramValue) |> ignore
+          match paramType with
+          | Some x -> cmd.Parameters.AddWithValue(paramName, x, paramValue) |> ignore
+          | None -> cmd.Parameters.AddWithValue(paramName, paramValue) |> ignore
 
     let executeTable (props: SqlProps) : SqlTable =
         if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
@@ -458,6 +461,7 @@ module Sql =
     | SqlValue.Uuid g -> box g
     | SqlValue.TimeWithTimeZone g -> box g
     | SqlValue.Null -> null
+    | SqlValue.Jsonb s -> box s
 
     let private valueAsOptionalObject = function
     | SqlValue.Short value -> box (Some value)
@@ -473,6 +477,7 @@ module Sql =
     | SqlValue.Uuid value -> box (Some value)
     | SqlValue.TimeWithTimeZone value -> box (Some value)
     | SqlValue.Null -> box (None)
+    | SqlValue.Jsonb value -> box (Some value)
 
     let multiline xs = String.concat Environment.NewLine xs
 
