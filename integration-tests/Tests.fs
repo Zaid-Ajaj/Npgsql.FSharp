@@ -15,16 +15,16 @@ type Actor = {
 let defaultConnection() =
     Sql.host "localhost"
     |> Sql.port 5432
-    |> Sql.username "postgres" 
+    |> Sql.username "postgres"
     |> Sql.password "postgres"
-    |> Sql.database "dvdrental" 
+    |> Sql.database "dvdrental"
     |> Sql.str
 
 let handleInfinityConnection() =
     Sql.host "localhost"
     |> Sql.port 5432
     |> Sql.username "postgres"
-    |> Sql.password "postgres" 
+    |> Sql.password "postgres"
     |> Sql.database "dvdrental"
     |> Sql.config "Convert Infinity DateTime=true;"
     |> Sql.str
@@ -63,16 +63,16 @@ defaultConnection()
 |> Sql.query "SELECT * FROM \"actor\""
 |> Sql.prepare
 |> Sql.executeTable
-|> Sql.mapEachRow (fun row -> 
+|> Sql.mapEachRow (fun row ->
     option {
         let! id = Sql.readInt "actor_id" row
         let! firstName = Sql.readString "first_name" row
-        let! lastName = Sql.readString "last_name" row 
+        let! lastName = Sql.readString "last_name" row
         let! lastUpdate = Sql.readDate "last_update" row
-        return { 
+        return {
             Id = id;
             FirstName = firstName
-            LastName = lastName 
+            LastName = lastName
             LastUpdate = lastUpdate
         }
     })
@@ -100,11 +100,11 @@ defaultConnection()
 printfn "Null roundtrip start"
 
 defaultConnection()
-|> Sql.connect 
+|> Sql.connect
 |> Sql.query "SELECT @nullValue"
 |> Sql.parameters [ "nullValue", SqlValue.Null ]
 |> Sql.executeScalar
-|> function 
+|> function
     | SqlValue.Null -> printfn "Succesfully returned null"
     | otherwise -> printfn "Unexpected %A" otherwise
 
@@ -138,28 +138,32 @@ defaultConnection()
 |> Sql.executeNonQuery
 |> printfn "Create Extention hstore returned %A"
 
-let inputMap =
-    ["property", "value from F#"]
-    |> Map.ofSeq
 
-printfn "HStore roundtrip start"
+// Unhandled Exception: System.NotSupportedException: Npgsql 3.x removed support for writing a parameter with an IEnumerable value, use .ToList()/.ToArray() instead
+// Need to add a NpgsqlTypeHandler for Map ?
 
-defaultConnection()
-|> Sql.connect
-|> Sql.query "select @map"
-|> Sql.parameters ["map", Sql.Value inputMap]
-|> Sql.executeScalar
-|> function
-    | SqlValue.HStore map ->
-        match Map.tryFind "property" map with
-        | Some "value from F#" -> "Mapping HStore works"
-        | _ -> "Something went wrong when reading HStore"
-    | _ -> "Something went wrong when mapping HStore"
-|> printfn "%A"
+// let inputMap =
+//     ["property", "value from F#"]
+//     |> Map.ofSeq
 
-printfn "HStore roundtrip end"
+// printfn "HStore roundtrip start"
 
-let inputJson = "{\"property\": \"value from F#\"}"
+// defaultConnection()
+// |> Sql.connect
+// |> Sql.query "select @map"
+// |> Sql.parameters ["map", Sql.Value inputMap]
+// |> Sql.executeScalar
+// |> function
+//     | SqlValue.HStore map ->
+//         match Map.tryFind "property" map with
+//         | Some "value from F#" -> "Mapping HStore works"
+//         | _ -> "Something went wrong when reading HStore"
+//     | _ -> "Something went wrong when mapping HStore"
+// |> printfn "%A"
+
+// printfn "HStore roundtrip end"
+let json_data = "value from F#"
+let inputJson = "{\"property\": \"" + json_data + "\"}"
 
 printfn "Jsonb roundtrip start"
 
@@ -178,8 +182,36 @@ defaultConnection()
 
 printfn "Jsonb roundtrip end"
 
-// Unhandled Exception: System.NotSupportedException: Npgsql 3.x removed support for writing a parameter with an IEnumerable value, use .ToList()/.ToArray() instead
-// Need to add a NpgsqlTypeHandler for Map ?
+defaultConnection()
+|> Sql.connect
+|> Sql.query "CREATE TABLE IF NOT EXISTS data_with_jsonb (data jsonb) "
+|> Sql.executeNonQuery
+|> printfn "Create Table data_with_jsonb returned %A"
+
+defaultConnection()
+|> Sql.connect
+|> Sql.query "INSERT INTO data_with_jsonb (data) VALUES (@jsonb)"
+|> Sql.parameters ["jsonb", SqlValue.Jsonb inputJson]
+|> Sql.executeNonQuery
+|> printfn "Insert into data_with_jsonb returned %A"
+
+defaultConnection()
+|> Sql.connect
+|> Sql.query "SELECT data ->> 'property' FROM data_with_jsonb"
+|> Sql.executeScalar
+|> function
+    | SqlValue.String json ->
+        match json_data = json with
+        | true -> sprintf "SELECT with json function works. Got *%s* as expected" json
+        | _ -> sprintf "Something went wrong when reading json, expected %s but got %s" json_data json
+    | x -> sprintf "Something went wrong when mapping json, %A" x
+|> printfn "%A"
+
+defaultConnection()
+|> Sql.connect
+|> Sql.query "DROP TABLE data_with_jsonb"
+|> Sql.executeNonQuery
+|> printfn "Drop Table data_with_jsonb returned %A"
 
 let bytesInput =
     [1 .. 5]
@@ -192,7 +224,7 @@ defaultConnection()
 |> Sql.parameters [ "manyBytes", Sql.Value bytesInput ]
 |> Sql.executeScalar
 |> function
-    | SqlValue.Bytea output -> 
+    | SqlValue.Bytea output ->
         if (output <> bytesInput)
         then failwith "Bytea roundtrip failed, the output was different"
         else printfn "Bytea roundtrip worked"
@@ -207,7 +239,7 @@ defaultConnection()
 |> Sql.parameters [ "uuid_input", Sql.Value guid ]
 |> Sql.executeScalar
 |> function
-    | SqlValue.Uuid output -> 
+    | SqlValue.Uuid output ->
         if (output.ToString() <> guid.ToString())
         then failwith "Uuid roundtrip failed, the output was different"
         else printfn "Uuid roundtrip worked"

@@ -7,6 +7,7 @@ This wrapper maps *raw* SQL data from the database into the `Sql` data structure
 Given the types:
 ```fs
 type SqlValue =
+    | Null
     | Short of int16
     | Int of int
     | Long of int64
@@ -19,7 +20,7 @@ type SqlValue =
     | HStore of Map<string, string>
     | Uuid of Guid
     | TimeWithTimeZone of DateTimeOffset
-    | Null
+    | Jsonb of string
 
 // A row is a list of key/value pairs
 type SqlRow = list<string * SqlValue>

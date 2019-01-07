@@ -1,9 +1,10 @@
 namespace Npgsql.FSharp
 
-open System 
+open System
 
 [<RequireQualifiedAccess>]
 type SqlValue =
+    | Null
     | Short of int16
     | Int of int
     | Long of int64
@@ -16,7 +17,6 @@ type SqlValue =
     | HStore of Map<string, string>
     | Uuid of Guid
     | TimeWithTimeZone of DateTimeOffset
-    | Null
     | Jsonb of string
 
 type SqlRow = list<string * SqlValue>
