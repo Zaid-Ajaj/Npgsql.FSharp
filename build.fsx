@@ -69,19 +69,18 @@ Target "StartDatabase" (fun _ ->
     let processResult (r : ProcessResult) =
         match r.OK, r.Messages.Count with
         | true, x when x = 2 ->
-            match (r.Messages.Item 1).Contains("Exit"), (r.Messages.Item 1).Contains("Up") with
-            | true, false -> Stopped
-            | false, true -> Running (r.Messages.Item 1)
-            | _ -> failwith (sprintf "Unable to process result from docker. Message contains both Exit and Up or none : %s" (r.Messages.Item 1))
+            match (r.Messages.Item 1) with
+            | m when m.Contains("Exit") -> Stopped
+            | m when m.Contains("Up") -> Running m
+            | _ -> failwith (sprintf "Unable to process result from docker. Message don't contain Exit or up : %s" (r.Messages.Item 1))
         | true, x when x = 1 -> NeverRan
         | _ -> DockerNotInstalled
 
-    let result =
-        sprintf "ps -a --filter name=%s" databaseDockerContainerName
-        |> runDockerResults
-        |> processResult
 
-    match result with
+    sprintf "ps -a --filter name=%s" databaseDockerContainerName
+    |> runDockerResults
+    |> processResult
+    |> function
     | NeverRan ->
         sprintf "build -t %s %s" databaseDockerImageName testsPath
         |> runDocker
@@ -117,9 +116,9 @@ let publish projectPath = fun () ->
     let nugetKey =
         match environVarOrNone "NUGET_KEY" with
         | Some nugetKey -> nugetKey
-        | None -> 
+        | None ->
             printfn "The Nuget API key must be set in a NUGET_KEY environmental variable"
-            System.Console.Write("Nuget API Key: ") 
+            System.Console.Write("Nuget API Key: ")
             System.Console.ReadLine()
     let nupkg =
         Directory.GetFiles(projectPath </> "bin" </> "Release")

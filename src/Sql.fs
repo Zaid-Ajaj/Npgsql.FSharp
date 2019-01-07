@@ -12,30 +12,30 @@ open System.Reflection
 open Microsoft.FSharp.Reflection
 
 module internal Utils =
-    let isOption (p:PropertyInfo) = 
+    let isOption (p:PropertyInfo) =
         p.PropertyType.IsGenericType &&
         p.PropertyType.GetGenericTypeDefinition() = typedefof<Option<_>>
 
-module Async = 
-    let map f comp = 
+module Async =
+    let map f comp =
         async {
-            let! result = comp 
+            let! result = comp
             return f result
         }
 
-type Sql() = 
+type Sql() =
     static member Value(value: int) = SqlValue.Int value
-    static member Value(value: string) = SqlValue.String value 
+    static member Value(value: string) = SqlValue.String value
     static member Value(value: int16) = SqlValue.Short value
     static member Value(value: double) = SqlValue.Number value
-    static member Value(value: decimal) = SqlValue.Decimal value 
-    static member Value(value: int64) = SqlValue.Long value 
-    static member Value(value: DateTime) = SqlValue.Date value 
-    static member Value(value: bool) = SqlValue.Bool value 
-    static member Value(value: DateTimeOffset) = SqlValue.TimeWithTimeZone value    
+    static member Value(value: decimal) = SqlValue.Decimal value
+    static member Value(value: int64) = SqlValue.Long value
+    static member Value(value: DateTime) = SqlValue.Date value
+    static member Value(value: bool) = SqlValue.Bool value
+    static member Value(value: DateTimeOffset) = SqlValue.TimeWithTimeZone value
     static member Value(value: Guid) = SqlValue.Uuid value
     static member Value(bytea: byte[]) = SqlValue.Bytea bytea
-    static member Value(map: Map<string, string>) = SqlValue.HStore map  
+    static member Value(map: Map<string, string>) = SqlValue.HStore map
 
 [<RequireQualifiedAccess>]
 module Sql =
@@ -96,84 +96,84 @@ module Sql =
     let queryMany queries props = { props with SqlQuery = queries }
     let parameters ls props = { props with Parameters = ls }
 
-    let readInt name (row: SqlRow) =    
+    let readInt name (row: SqlRow) =
         row
         |> List.tryFind (fun (colName, value) -> colName = name)
-        |> Option.map snd 
-        |> function 
-            | Some (SqlValue.Int value) -> Some value 
-            | _ -> None 
-    
+        |> Option.map snd
+        |> function
+            | Some (SqlValue.Int value) -> Some value
+            | _ -> None
+
     let readLong name (row: SqlRow)  =
         row
         |> List.tryFind (fun (colName, value) -> colName = name)
-        |> Option.map snd 
-        |> function 
-            | Some (SqlValue.Long value) -> Some value 
-            | _ -> None 
+        |> Option.map snd
+        |> function
+            | Some (SqlValue.Long value) -> Some value
+            | _ -> None
 
-    let readString name (row: SqlRow) =    
+    let readString name (row: SqlRow) =
         row
         |> List.tryFind (fun (colName, value) -> colName = name)
-        |> Option.map snd 
-        |> function 
-            | Some (SqlValue.String value) -> Some value 
-            | _ -> None 
+        |> Option.map snd
+        |> function
+            | Some (SqlValue.String value) -> Some value
+            | _ -> None
 
-    let readDate name (row: SqlRow) =    
+    let readDate name (row: SqlRow) =
         row
         |> List.tryFind (fun (colName, value) -> colName = name)
-        |> Option.map snd 
-        |> function 
-            | Some (SqlValue.Date value) -> Some value 
-            | _ -> None 
+        |> Option.map snd
+        |> function
+            | Some (SqlValue.Date value) -> Some value
+            | _ -> None
 
-    let readBool name (row: SqlRow) =    
+    let readBool name (row: SqlRow) =
         row
         |> List.tryFind (fun (colName, value) -> colName = name)
-        |> Option.map snd 
-        |> function 
-            | Some (SqlValue.Bool value) -> Some value 
-            | _ -> None 
+        |> Option.map snd
+        |> function
+            | Some (SqlValue.Bool value) -> Some value
+            | _ -> None
 
-    let readDecimal name (row: SqlRow) =    
+    let readDecimal name (row: SqlRow) =
         row
         |> List.tryFind (fun (colName, value) -> colName = name)
-        |> Option.map snd 
-        |> function 
-            | Some (SqlValue.Decimal value) -> Some value 
-            | _ -> None 
+        |> Option.map snd
+        |> function
+            | Some (SqlValue.Decimal value) -> Some value
+            | _ -> None
 
-    let readNumber name (row: SqlRow) =    
+    let readNumber name (row: SqlRow) =
         row
         |> List.tryFind (fun (colName, value) -> colName = name)
-        |> Option.map snd 
-        |> function 
-            | Some (SqlValue.Number value) -> Some value 
-            | _ -> None 
+        |> Option.map snd
+        |> function
+            | Some (SqlValue.Number value) -> Some value
+            | _ -> None
 
-    let readUuid name (row: SqlRow) =    
+    let readUuid name (row: SqlRow) =
         row
         |> List.tryFind (fun (colName, value) -> colName = name)
-        |> Option.map snd 
-        |> function 
-            | Some (SqlValue.Uuid value) -> Some value 
-            | _ -> None 
+        |> Option.map snd
+        |> function
+            | Some (SqlValue.Uuid value) -> Some value
+            | _ -> None
 
-    let readBytea name (row: SqlRow) =    
+    let readBytea name (row: SqlRow) =
         row
         |> List.tryFind (fun (colName, value) -> colName = name)
-        |> Option.map snd 
-        |> function 
-            | Some (SqlValue.Bytea value) -> Some value 
-            | _ -> None 
+        |> Option.map snd
+        |> function
+            | Some (SqlValue.Bytea value) -> Some value
+            | _ -> None
 
-    let readHStore name (row: SqlRow) =    
+    let readHStore name (row: SqlRow) =
         row
         |> List.tryFind (fun (colName, value) -> colName = name)
-        |> Option.map snd 
-        |> function 
-            | Some (SqlValue.HStore value) -> Some value 
+        |> Option.map snd
+        |> function
+            | Some (SqlValue.HStore value) -> Some value
             | _ -> None
 
     let toBool = function
@@ -201,59 +201,59 @@ module Sql =
         | value -> failwithf "Could not convert %A into a floating number" value
 
     let (|NullInt|_|) = function
-        | SqlValue.Null -> None  
-        | SqlValue.Int value -> Some value 
+        | SqlValue.Null -> None
+        | SqlValue.Int value -> Some value
         | _ -> None
 
     let (|NullShort|_|) = function
-        | SqlValue.Null -> None  
-        | SqlValue.Short value -> Some value 
+        | SqlValue.Null -> None
+        | SqlValue.Short value -> Some value
         | _ -> None
 
     let (|NullLong|_|) = function
-        | SqlValue.Null -> None  
-        | SqlValue.Long value -> Some value 
+        | SqlValue.Null -> None
+        | SqlValue.Long value -> Some value
         | _ -> None
 
     let (|NullDate|_|) = function
-        | SqlValue.Null -> None  
-        | SqlValue.Date value -> Some value 
+        | SqlValue.Null -> None
+        | SqlValue.Date value -> Some value
         | _ -> None
-    
+
     let (|NullBool|_|) = function
-        | SqlValue.Null -> None  
-        | SqlValue.Bool value -> Some value 
-        | _ -> None    
+        | SqlValue.Null -> None
+        | SqlValue.Bool value -> Some value
+        | _ -> None
 
     let (|NullTimeWithTimeZone|_|) = function
-        | SqlValue.Null -> None  
-        | SqlValue.TimeWithTimeZone value -> Some value 
-        | _ -> None  
+        | SqlValue.Null -> None
+        | SqlValue.TimeWithTimeZone value -> Some value
+        | _ -> None
 
     let (|NullDecimal|_|) = function
-        | SqlValue.Null -> None  
-        | SqlValue.Decimal value -> Some value 
-        | _ -> None  
+        | SqlValue.Null -> None
+        | SqlValue.Decimal value -> Some value
+        | _ -> None
 
     let (|NullBytea|_|) = function
-        | SqlValue.Null -> None  
-        | SqlValue.Bytea value -> Some value 
-        | _ -> None  
+        | SqlValue.Null -> None
+        | SqlValue.Bytea value -> Some value
+        | _ -> None
 
     let (|NullHStore|_|) = function
-        | SqlValue.Null -> None  
-        | SqlValue.HStore value -> Some value 
-        | _ -> None  
+        | SqlValue.Null -> None
+        | SqlValue.HStore value -> Some value
+        | _ -> None
 
     let (|NullUuid|_|) = function
-        | SqlValue.Null -> None  
-        | SqlValue.Uuid value -> Some value 
-        | _ -> None  
+        | SqlValue.Null -> None
+        | SqlValue.Uuid value -> Some value
+        | _ -> None
 
     let (|NullNumber|_|) = function
-        | SqlValue.Null -> None  
-        | SqlValue.Number value -> Some value 
-        | _ -> None  
+        | SqlValue.Null -> None
+        | SqlValue.Number value -> Some value
+        | _ -> None
 
     let readValue (columnName: Option<string>) value =
         match box value with
@@ -275,12 +275,12 @@ module Sql =
             |> SqlValue.HStore
         | null -> SqlValue.Null
         | :? System.DBNull -> SqlValue.Null
-        | other -> 
+        | other ->
             let typeName = (other.GetType()).FullName
-            match columnName with 
+            match columnName with
             | Some name -> failwithf "Unable to read column '%s' of type '%s'" name typeName
             | None -> failwithf "Unable to read column of type '%s'" typeName
-    
+
     /// Reads a single row from the data reader synchronously
     let readRow (reader : NpgsqlDataReader) : SqlRow =
         let readFieldSync fieldIndex =
@@ -339,7 +339,7 @@ module Sql =
     let readTableTask (reader: NpgsqlDataReader) =
         readTableTaskCt CancellationToken.None reader
 
-    let readTableAsync (reader: NpgsqlDataReader) = 
+    let readTableAsync (reader: NpgsqlDataReader) =
         async {
             let! ct = Async.CancellationToken
             return!
@@ -374,9 +374,9 @@ module Sql =
                 upcast value, None
             | SqlValue.Jsonb x -> upcast x, Some NpgsqlTypes.NpgsqlDbType.Jsonb
 
-          let paramName = 
+          let paramName =
             if not (paramName.StartsWith "@")
-            then sprintf "@%s" paramName 
+            then sprintf "@%s" paramName
             else paramName
 
           match paramType with
@@ -419,7 +419,7 @@ module Sql =
                 executeTableTaskCt ct props
                 |> Async.AwaitTask
         }
- 
+
     let executeTableSafeTaskCt (cancellationToken : CancellationToken) (props: SqlProps) : Task<Result<SqlTable, exn>> =
         task {
             try
@@ -446,7 +446,7 @@ module Sql =
                 executeTableSafeTaskCt ct props
                 |> Async.AwaitTask
         }
- 
+
     let private valueAsObject = function
     | SqlValue.Short s -> box s
     | SqlValue.Int i -> box i
@@ -505,7 +505,7 @@ module Sql =
         populateCmd command props
         command.ExecuteScalar()
         |> readValue None
- 
+
     /// Executes the query and returns the number of rows affected
     let executeNonQuery (props: SqlProps) : int =
         if List.isEmpty props.SqlQuery then failwith "No query provided to execute..."
@@ -629,7 +629,7 @@ module Sql =
     let mapEachRow (f: SqlRow -> Option<'a>) (table: SqlTable) =
         List.choose f table
 
-    let parseRow<'a> (row : SqlRow) = 
+    let parseRow<'a> (row : SqlRow) =
         let findRowValue isOptional name row =
             match isOptional, List.tryFind (fun (n, _) -> n = name) row with
             | _, None -> failwithf "Missing parameter: %s" name
