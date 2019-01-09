@@ -145,6 +145,8 @@ Target "RunTests" <| fun _ ->
 
 
 "Clean"
+ ==> "RestoreLibProject"
+ ==> "Build"
  ==> "PublishNuget"
 
 RunTargetOrDefault "Build"
