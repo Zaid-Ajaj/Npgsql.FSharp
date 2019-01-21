@@ -10,6 +10,7 @@ open FSharp.Control.Tasks
 
 open System.Reflection
 open Microsoft.FSharp.Reflection
+open System.Security.Cryptography.X509Certificates
 
 module internal Utils =
     let isOption (p:PropertyInfo) =
@@ -56,6 +57,7 @@ module Sql =
         Parameters : SqlRow
         IsFunction : bool
         NeedPrepare : bool
+        ProvideClientCertificatesHandler: X509CertificateCollection -> unit
     }
 
     let private defaultConString() : ConnectionStringBuilder = {
@@ -72,6 +74,7 @@ module Sql =
         Parameters = [];
         IsFunction = false
         NeedPrepare = false
+        ProvideClientCertificatesHandler = fun _ -> ()
     }
 
     let connect constr  = { defaultProps() with ConnectionString = constr }
@@ -510,6 +513,7 @@ module Sql =
     let executeNonQuery (props: SqlProps) : int =
         if List.isEmpty props.SqlQuery then failwith "No query provided to execute..."
         use connection = new NpgsqlConnection(props.ConnectionString)
+        connection.ProvideClientCertificatesCallback <- new ProvideClientCertificatesCallback(props.ProvideClientCertificatesHandler)
         connection.Open()
         use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
         if props.NeedPrepare then command.Prepare()
