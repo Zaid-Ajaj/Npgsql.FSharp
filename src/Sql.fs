@@ -57,7 +57,7 @@ module Sql =
         Parameters : SqlRow
         IsFunction : bool
         NeedPrepare : bool
-        ProvideClientCertificatesHandler: X509CertificateCollection -> unit
+        ClientCertificate: X509Certificate option
     }
 
     let private defaultConString() : ConnectionStringBuilder = {
@@ -74,10 +74,11 @@ module Sql =
         Parameters = [];
         IsFunction = false
         NeedPrepare = false
-        ProvideClientCertificatesHandler = fun _ -> ()
+        ClientCertificate = None
     }
 
     let connect constr  = { defaultProps() with ConnectionString = constr }
+    let withCert cert props = { props with ClientCertificate = Some cert }
     let host x = { defaultConString() with Host = x }
     let username x con = { con with Username = x }
     let password x con = { con with Password = x }
@@ -98,6 +99,15 @@ module Sql =
     let prepare  props = { props with NeedPrepare = true}
     let queryMany queries props = { props with SqlQuery = queries }
     let parameters ls props = { props with Parameters = ls }
+
+    let newConnection (props: SqlProps): NpgsqlConnection =
+        let connection = new NpgsqlConnection(props.ConnectionString)
+        match props.ClientCertificate with
+        | Some cert ->
+            connection.ProvideClientCertificatesCallback <- new ProvideClientCertificatesCallback(fun certs ->
+                certs.Add(cert) |> ignore)
+        | None -> ()
+        connection
 
     let readInt name (row: SqlRow) =
         row
@@ -388,7 +398,7 @@ module Sql =
 
     let executeTable (props: SqlProps) : SqlTable =
         if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
-        use connection = new NpgsqlConnection(props.ConnectionString)
+        use connection = newConnection props
         connection.Open()
         use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
         if props.NeedPrepare then command.Prepare()
@@ -403,7 +413,7 @@ module Sql =
     let executeTableTaskCt (cancellationToken : CancellationToken) (props: SqlProps) =
         task {
             if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
-            use connection = new NpgsqlConnection(props.ConnectionString)
+            use connection = newConnection props
             do! connection.OpenAsync(cancellationToken)
             use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
             if props.NeedPrepare then command.Prepare()
@@ -427,7 +437,7 @@ module Sql =
         task {
             try
                 if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
-                use connection = new NpgsqlConnection(props.ConnectionString)
+                use connection = newConnection props
                 do! connection.OpenAsync(cancellationToken)
                 use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
                 if props.NeedPrepare then command.Prepare()
@@ -489,7 +499,7 @@ module Sql =
         if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
         let queryCount = List.length props.SqlQuery
         let singleQuery = String.concat ";" props.SqlQuery
-        use connection = new NpgsqlConnection(props.ConnectionString)
+        use connection = newConnection props
         connection.Open()
         use command = new NpgsqlCommand(singleQuery, connection)
         if props.NeedPrepare then command.Prepare()
@@ -501,7 +511,7 @@ module Sql =
 
     let executeScalar (props: SqlProps) : SqlValue =
         if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
-        use connection = new NpgsqlConnection(props.ConnectionString)
+        use connection = newConnection props
         connection.Open()
         use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
         if props.NeedPrepare then command.Prepare()
@@ -512,8 +522,7 @@ module Sql =
     /// Executes the query and returns the number of rows affected
     let executeNonQuery (props: SqlProps) : int =
         if List.isEmpty props.SqlQuery then failwith "No query provided to execute..."
-        use connection = new NpgsqlConnection(props.ConnectionString)
-        connection.ProvideClientCertificatesCallback <- new ProvideClientCertificatesCallback(props.ProvideClientCertificatesHandler)
+        use connection = newConnection props
         connection.Open()
         use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
         if props.NeedPrepare then command.Prepare()
@@ -528,7 +537,7 @@ module Sql =
     /// Executes the query as a task and returns the number of rows affected
     let executeNonQueryTaskCt (cancellationToken : CancellationToken) (props: SqlProps) =
         task {
-            use connection = new NpgsqlConnection(props.ConnectionString)
+            use connection = newConnection props
             do! connection.OpenAsync(cancellationToken)
             use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
             if props.NeedPrepare then command.Prepare()
@@ -553,7 +562,7 @@ module Sql =
     let executeNonQuerySafeTaskCt (cancellationToken : CancellationToken) (props: SqlProps) =
         task {
             try
-                use connection = new NpgsqlConnection(props.ConnectionString)
+                use connection = newConnection props
                 do! connection.OpenAsync(cancellationToken)
                 use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
                 if props.NeedPrepare then command.Prepare()
@@ -586,7 +595,7 @@ module Sql =
     let executeScalarTaskCt (cancellationToken : CancellationToken)  (props: SqlProps) =
         task {
             if List.isEmpty props.SqlQuery then failwith "No query provided to execute..."
-            use connection = new NpgsqlConnection(props.ConnectionString)
+            use connection = newConnection props
             do! connection.OpenAsync(cancellationToken)
             use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
             if props.NeedPrepare then command.Prepare()
@@ -609,7 +618,7 @@ module Sql =
         task {
             try
                 if List.isEmpty props.SqlQuery then failwith "No query provided to execute..."
-                use connection = new NpgsqlConnection(props.ConnectionString)
+                use connection = newConnection props
                 do! connection.OpenAsync(cancellationToken)
                 use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
                 if props.NeedPrepare then command.Prepare()
