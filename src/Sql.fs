@@ -643,7 +643,6 @@ module Sql =
     let executeManyTaskCt (cancellationToken : CancellationToken) (props: SqlProps)  =
         task {
             if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
-            let queryCount = List.length props.SqlQuery
             let singleQuery = String.concat ";" props.SqlQuery
             use connection = newConnection props
             do! connection.OpenAsync()
@@ -652,10 +651,16 @@ module Sql =
             populateCmd command props
             use! reader = command.ExecuteReaderAsync()
             let pgreader = reader :?> NpgsqlDataReader
-            return
-                [ for _ in 1 .. queryCount do
-                    yield readTable pgreader
-                    pgreader.NextResult() |> ignore ]
+            let rec loop acc = task {
+                let acc = readTable pgreader::acc
+                let! rest = pgreader.NextResultAsync()
+                if rest then
+                    return! loop acc
+                else
+                    return List.rev acc
+
+            }
+            return! loop []
         }
 
     let executeManyTask (props: SqlProps) =
