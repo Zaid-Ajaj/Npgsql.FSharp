@@ -639,6 +639,36 @@ module Sql =
                 |> Async.AwaitTask
         }
 
+    /// Executes multiple queries and returns each result set as a distinct table
+    let executeManyTaskCt (cancellationToken : CancellationToken) (props: SqlProps)  =
+        task {
+            if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
+            let queryCount = List.length props.SqlQuery
+            let singleQuery = String.concat ";" props.SqlQuery
+            use connection = newConnection props
+            do! connection.OpenAsync()
+            use command = new NpgsqlCommand(singleQuery, connection)
+            if props.NeedPrepare then command.Prepare()
+            populateCmd command props
+            use! reader = command.ExecuteReaderAsync()
+            let pgreader = reader :?> NpgsqlDataReader
+            return
+                [ for _ in 1 .. queryCount do
+                    yield readTable pgreader
+                    pgreader.NextResult() |> ignore ]
+        }
+
+    let executeManyTask (props: SqlProps) =
+        executeManyTaskCt CancellationToken.None props
+
+    let executeManyAsync (props: SqlProps) =
+        async {
+            let! ct = Async.CancellationToken
+            return!
+                executeManyTaskCt ct props
+                |> Async.AwaitTask
+        }
+
     let mapEachRow (f: SqlRow -> Option<'a>) (table: SqlTable) =
         List.choose f table
 
