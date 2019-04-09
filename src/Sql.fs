@@ -338,26 +338,40 @@ module Sql =
     let readTable (reader: NpgsqlDataReader) : SqlTable =
         [ while reader.Read() do yield readRow reader ]
 
-    let readTableTaskCt (cancellationToken : CancellationToken) (reader: NpgsqlDataReader) =
-        let rec readRows rows = task {
-            let! canRead = reader.ReadAsync(cancellationToken)
-            if canRead then
-              let! row = readRowTaskCt cancellationToken reader
-              return! readRows (List.ofArray row :: rows)
-            else
-              return rows
+    // tail-call optimized while expression for async blocks
+    // https://stackoverflow.com/questions/31642295/while-in-async-computation-expression-where-the-condition-is-async
+    let rec asyncWhile (predicateFn : unit -> Async<bool>) (action : Async<unit>) : Async<unit> = 
+        async {
+            let! b = predicateFn()
+            if b then
+                do! action
+                return! asyncWhile predicateFn action
         }
-        readRows []
 
-    let readTableTask (reader: NpgsqlDataReader) =
+    // extens the async builder with TCO-ed while expression
+    type AsyncBuilder with
+        member x.While(cond, body) = asyncWhile cond body
+
+    let readTableTaskCt (cancellationToken : CancellationToken) (reader: NpgsqlDataReader) =
+        let expr = async {
+            let rows = ResizeArray<_>()
+            while Async.AwaitTask (reader.ReadAsync(cancellationToken)) do
+                let! row = Async.AwaitTask(readRowTaskCt cancellationToken reader)
+                rows.Add (List.ofArray row)
+            
+            return List.ofArray (rows.ToArray())
+        }
+
+        task { return! expr }
+        
+
+    let readTableTask (reader: NpgsqlDataReader) : Task<SqlTable> =
         readTableTaskCt CancellationToken.None reader
 
-    let readTableAsync (reader: NpgsqlDataReader) =
+    let readTableAsync (reader: NpgsqlDataReader) : Async<SqlTable> =
         async {
             let! ct = Async.CancellationToken
-            return!
-                readTableTaskCt ct reader
-                |> Async.AwaitTask
+            return! Async.AwaitTask (readTableTaskCt ct reader)
         }
 
     let private populateCmd (cmd: NpgsqlCommand) (props: SqlProps) =
@@ -432,7 +446,7 @@ module Sql =
                 executeTableTaskCt ct props
                 |> Async.AwaitTask
         }
-
+ 
     let executeTableSafeTaskCt (cancellationToken : CancellationToken) (props: SqlProps) : Task<Result<SqlTable, exn>> =
         task {
             try
