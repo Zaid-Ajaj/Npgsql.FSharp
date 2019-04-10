@@ -433,6 +433,35 @@ module Sql =
                 |> Async.AwaitTask
         }
 
+    let executeReader (props: SqlProps) (read: NpgsqlDataReader -> Option<'t>) : 't list = 
+        if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
+        use connection = newConnection props
+        connection.Open()
+        use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
+        if props.NeedPrepare then command.Prepare()
+        do populateCmd command props
+        use reader = command.ExecuteReader()
+        let postgresReader = unbox<NpgsqlDataReader> reader
+        let result = ResizeArray<'t option>()
+        while reader.Read() do result.Add (read postgresReader) 
+        List.choose id (List.ofSeq result) 
+
+    let executeReaderSafe (props: SqlProps) (read: NpgsqlDataReader -> Option<'t>) = 
+        try
+          if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
+          use connection = newConnection props
+          connection.Open()
+          use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
+          if props.NeedPrepare then command.Prepare()
+          do populateCmd command props
+          use reader = command.ExecuteReader()
+          let postgresReader = unbox<NpgsqlDataReader> reader
+          let result = ResizeArray<'t option>()
+          while reader.Read() do result.Add (read postgresReader)               
+          Ok (List.choose id (List.ofSeq result)) 
+        with
+        | ex -> Error ex
+
     let executeReaderTaskCt (cancellationToken : CancellationToken) (props: SqlProps) (read: NpgsqlDataReader -> Option<'t>) : Task<'t list> = 
         task {
             if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
