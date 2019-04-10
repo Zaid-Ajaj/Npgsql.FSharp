@@ -338,32 +338,18 @@ module Sql =
     let readTable (reader: NpgsqlDataReader) : SqlTable =
         [ while reader.Read() do yield readRow reader ]
 
-    // tail-call optimized while expression for async blocks
-    // https://stackoverflow.com/questions/31642295/while-in-async-computation-expression-where-the-condition-is-async
-    let rec asyncWhile (predicateFn : unit -> Async<bool>) (action : Async<unit>) : Async<unit> = 
-        async {
-            let! b = predicateFn()
-            if b then
-                do! action
-                return! asyncWhile predicateFn action
-        }
-
-    // extens the async builder with TCO-ed while expression
-    type AsyncBuilder with
-        member x.While(cond, body) = asyncWhile cond body
-
     let readTableTaskCt (cancellationToken : CancellationToken) (reader: NpgsqlDataReader) =
-        let expr = async {
+        task {
             let rows = ResizeArray<_>()
-            while Async.AwaitTask (reader.ReadAsync(cancellationToken)) do
-                let! row = Async.AwaitTask(readRowTaskCt cancellationToken reader)
+            let canRead = ref true 
+            while !canRead do 
+                let! readerAvailable = reader.ReadAsync(cancellationToken)
+                canRead := readerAvailable
+                let! row = readRowTaskCt cancellationToken reader
                 rows.Add (List.ofArray row)
             
             return List.ofArray (rows.ToArray())
         }
-
-        task { return! expr }
-        
 
     let readTableTask (reader: NpgsqlDataReader) : Task<SqlTable> =
         readTableTaskCt CancellationToken.None reader
@@ -435,9 +421,9 @@ module Sql =
             use! reader = command.ExecuteReaderAsync(cancellationToken)
             return! readTableTaskCt cancellationToken (reader |> unbox<NpgsqlDataReader>)
         }
+        
     let executeTableTask (props: SqlProps) =
         executeTableTaskCt CancellationToken.None
-
 
     let executeTableAsync (props: SqlProps) : Async<SqlTable> =
         async {
@@ -446,7 +432,71 @@ module Sql =
                 executeTableTaskCt ct props
                 |> Async.AwaitTask
         }
+
+    let executeReaderTaskCt (cancellationToken : CancellationToken) (props: SqlProps) (read: NpgsqlDataReader -> Option<'t>) : Task<'t list> = 
+        task {
+            if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
+            use connection = newConnection props
+            do! connection.OpenAsync(cancellationToken)
+            use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
+            if props.NeedPrepare then command.Prepare()
+            do populateCmd command props
+            use! reader = command.ExecuteReaderAsync(cancellationToken)
+            let postgresReader = unbox<NpgsqlDataReader> reader
+            let result = ResizeArray<'t option>()
+            let canRead = ref true 
+            while !canRead do   
+                let! readMore = reader.ReadAsync cancellationToken 
+                canRead := readMore 
+                result.Add (read postgresReader) 
+
+            return List.choose id (List.ofSeq result) 
+        }
+
+    let executeReaderTask (read: NpgsqlDataReader -> Option<'t>) (props: SqlProps) =
+        executeReaderTaskCt CancellationToken.None props read
+
+    let executeReaderAsync (read: NpgsqlDataReader -> Option<'t>) (props: SqlProps) =
+        async {
+            let! token = Async.CancellationToken
+            return!
+                executeReaderTaskCt token props read
+                |> Async.AwaitTask
+        }
+
+    let executeReaderSafeTaskCt (cancellationToken : CancellationToken) (props: SqlProps) (read: NpgsqlDataReader -> Option<'t>) : Task<Result<'t list, exn>> = 
+        task {
+            try
+                if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
+                use connection = newConnection props
+                do! connection.OpenAsync(cancellationToken)
+                use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
+                if props.NeedPrepare then command.Prepare()
+                do populateCmd command props
+                use! reader = command.ExecuteReaderAsync(cancellationToken)
+                let postgresReader = unbox<NpgsqlDataReader> reader
+                let result = ResizeArray<'t option>()
+                let canRead = ref true 
+                while !canRead do   
+                    let! readMore = reader.ReadAsync cancellationToken 
+                    canRead := readMore 
+                    result.Add (read postgresReader) 
+
+                return Ok (List.choose id (List.ofSeq result)) 
+            with 
+            | ex -> return Error ex    
+        }
+
+    let executeReaderSafeTask read props = 
+        executeReaderSafeTaskCt CancellationToken.None props read
  
+    let executeReaderSafeAsync read props = 
+        async {
+            let! token = Async.CancellationToken
+            let! readerResult = Async.AwaitTask (executeReaderSafeTaskCt token read props)
+            return readerResult
+        } 
+
     let executeTableSafeTaskCt (cancellationToken : CancellationToken) (props: SqlProps) : Task<Result<SqlTable, exn>> =
         task {
             try

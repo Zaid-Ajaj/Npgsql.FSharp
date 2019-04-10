@@ -80,6 +80,26 @@ defaultConnection()
 
 defaultConnection()
 |> Sql.connect
+|> Sql.query "SELECT * FROM \"actor\""
+|> Sql.prepare
+|> Sql.executeReaderAsync (fun reader -> 
+    let row = Sql.readRow reader 
+    option {
+        let! id = Sql.readInt "actor_id" row
+        let! firstName = Sql.readString "first_name" row
+        let! lastName = Sql.readString "last_name" row
+        let! lastUpdate = Sql.readDate "last_update" row
+        return {
+            Id = id;
+            FirstName = firstName
+            LastName = lastName
+            LastUpdate = lastUpdate
+        }
+    })
+|> printfn "%A"
+
+defaultConnection()
+|> Sql.connect
 |> Sql.func "film_in_stock"
 |> Sql.parameters [ "p_film_id", Sql.Value 1; "p_store_id", Sql.Value 1]
 |> Sql.executeScalar
