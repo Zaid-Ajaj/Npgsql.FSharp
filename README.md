@@ -103,7 +103,7 @@ let getAllUsers() : User list =
             }
         }) 
 ```
-### Use `NgpsqlDataReader` instead of intermediate table for lower memory footprint
+### Use `NpgsqlDataReader` instead of creating intermediate table for lower memory footprint
 ```fsharp
 let getAllUsers() : User list =
     defaultConnection
