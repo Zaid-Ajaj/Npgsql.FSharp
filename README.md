@@ -103,6 +103,25 @@ let getAllUsers() : User list =
             }
         }) 
 ```
+### Use `NgpsqlDataReader` instead of intermediate table for lower memory footprint
+```fsharp
+let getAllUsers() : User list =
+    defaultConnection
+    |> Sql.connect
+    |> Sql.query "SELECT * FROM \"users\""
+    |> Sql.executeReader (fun reader -> 
+        let row = Sql.readRow reader
+        option {
+            let! id = Sql.readInt "user_id" row 
+            let fname = Sql.readString "first_name" row 
+            let lname = Sql.readString "last_name" row
+            return { 
+                Id = id; 
+                FirstName = defaultArg fname ""  
+                LastName = defaultArg lname "" 
+            }
+        }) 
+```
 the library doesn't provide an `option` monad by default, you add your own or use this simple one instead:
 ```fs
 type OptionBuilder() =
@@ -148,6 +167,7 @@ let bookAttributes =
     |> Map.add "weight" "500g"
 
 defaultConnection
+|> Sql.connect
 |> Sql.query "INSERT INTO \"books\" (id,title,attrs) VALUES (@bookId,@title,@attributes)"
 |> Sql.parameters
     [ "bookId", Sql.Value 20
