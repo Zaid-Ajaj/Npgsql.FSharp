@@ -449,6 +449,7 @@ module Sql =
                 populateRow command parameterSet
                 let affectedRows = command.ExecuteNonQuery() 
                 affectedRowsByQuery.Add affectedRows
+        transaction.Commit()
         List.ofSeq affectedRowsByQuery
 
     let executeTransactionAsync queries (props: SqlProps)  = 
@@ -465,9 +466,9 @@ module Sql =
                 for parameterSet in parameterSets do
                     use command = new NpgsqlCommand(query, connection, transaction)
                     populateRow command parameterSet
-                    let! affectedRows = Async.AwaitTask (command.ExecuteNonQueryAsync(token)) 
+                    let! affectedRows = Async.AwaitTask (command.ExecuteNonQueryAsync token) 
                     affectedRowsByQuery.Add affectedRows
-            
+            do! Async.AwaitTask(transaction.CommitAsync token)
             return List.ofSeq affectedRowsByQuery
         }
 
@@ -481,7 +482,6 @@ module Sql =
 
     let executeTransactionSafe queries (props: SqlProps) = 
         try
-
             if List.isEmpty queries  
             then Ok [ ]
             else 
@@ -495,8 +495,8 @@ module Sql =
                     populateRow command parameterSet
                     let affectedRows = command.ExecuteNonQuery() 
                     affectedRowsByQuery.Add affectedRows
+            transaction.Commit()
             Ok (List.ofSeq affectedRowsByQuery)
-        
         with 
         | ex -> Error ex
     
