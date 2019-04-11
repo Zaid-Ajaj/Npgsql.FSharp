@@ -360,10 +360,8 @@ module Sql =
             return! Async.AwaitTask (readTableTaskCt ct reader)
         }
 
-    let private populateCmd (cmd: NpgsqlCommand) (props: SqlProps) =
-        if props.IsFunction then cmd.CommandType <- CommandType.StoredProcedure
-
-        for (paramName, value) in props.Parameters do
+    let private populateRow (cmd: NpgsqlCommand) (row: SqlRow) = 
+        for (paramName, value) in row do
           let paramValue, paramType : (obj * NpgsqlTypes.NpgsqlDbType option) =
             match value with
             | SqlValue.String text -> upcast text, None
@@ -395,6 +393,10 @@ module Sql =
           match paramType with
           | Some x -> cmd.Parameters.AddWithValue(paramName, x, paramValue) |> ignore
           | None -> cmd.Parameters.AddWithValue(paramName, paramValue) |> ignore
+    
+    let private populateCmd (cmd: NpgsqlCommand) (props: SqlProps) =
+        if props.IsFunction then cmd.CommandType <- CommandType.StoredProcedure
+        populateRow cmd props.Parameters
 
     let executeTable (props: SqlProps) : SqlTable =
         if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
@@ -433,6 +435,71 @@ module Sql =
                 |> Async.AwaitTask
         }
 
+    let executeTransaction queries (props: SqlProps)  = 
+        if List.isEmpty queries  
+        then [ ]
+        else 
+        use connection = newConnection props
+        connection.Open()
+        use transaction = connection.BeginTransaction()
+        let affectedRowsByQuery = ResizeArray<int>()
+        for (query, parameterSets) in queries do
+            for parameterSet in parameterSets do
+                use command = new NpgsqlCommand(query, connection, transaction)
+                populateRow command parameterSet
+                let affectedRows = command.ExecuteNonQuery() 
+                affectedRowsByQuery.Add affectedRows
+        List.ofSeq affectedRowsByQuery
+
+    let executeTransactionAsync queries (props: SqlProps)  = 
+        async {
+            let! token = Async.CancellationToken
+            if List.isEmpty queries  
+            then return [ ]
+            else 
+            use connection = newConnection props
+            do! Async.AwaitTask (connection.OpenAsync token)
+            use transaction = connection.BeginTransaction()
+            let affectedRowsByQuery = ResizeArray<int>()
+            for (query, parameterSets) in queries do
+                for parameterSet in parameterSets do
+                    use command = new NpgsqlCommand(query, connection, transaction)
+                    populateRow command parameterSet
+                    let! affectedRows = Async.AwaitTask (command.ExecuteNonQueryAsync(token)) 
+                    affectedRowsByQuery.Add affectedRows
+            
+            return List.ofSeq affectedRowsByQuery
+        }
+
+    let executeTransactionSafeAsync queries (props: SqlProps)  = 
+        async {
+            let! result = Async.Catch (executeTransactionAsync queries props)
+            match result with 
+            | Choice1Of2 affectedRows -> return Ok affectedRows  
+            | Choice2Of2 ex -> return Error ex
+        }
+
+    let executeTransactionSafe queries (props: SqlProps) = 
+        try
+
+            if List.isEmpty queries  
+            then Ok [ ]
+            else 
+            use connection = newConnection props
+            connection.Open()
+            use transaction = connection.BeginTransaction()
+            let affectedRowsByQuery = ResizeArray<int>()
+            for (query, parameterSets) in queries do
+                for parameterSet in parameterSets do
+                    use command = new NpgsqlCommand(query, connection, transaction)
+                    populateRow command parameterSet
+                    let affectedRows = command.ExecuteNonQuery() 
+                    affectedRowsByQuery.Add affectedRows
+            Ok (List.ofSeq affectedRowsByQuery)
+        
+        with 
+        | ex -> Error ex
+    
     let executeReader (props: SqlProps) (read: NpgsqlDataReader -> Option<'t>) : 't list = 
         if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
         use connection = newConnection props
