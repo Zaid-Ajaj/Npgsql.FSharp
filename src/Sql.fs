@@ -500,7 +500,7 @@ module Sql =
         with 
         | ex -> Error ex
     
-    let executeReader (props: SqlProps) (read: NpgsqlDataReader -> Option<'t>) : 't list = 
+    let executeReader (read: NpgsqlDataReader -> Option<'t>) (props: SqlProps) : 't list = 
         if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
         use connection = newConnection props
         connection.Open()

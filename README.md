@@ -144,6 +144,24 @@ let userExists (name: string) : bool =
     |> Sql.toBool
 ```
 
+### Execute multiple inserts or updates in a single transaction:
+```fs
+connectionString
+|> Sql.connect
+|> Sql.executeTransaction // SqlProps -> int list
+    [
+        "INSERT INTO ... VALUES (@number)", [
+            [ "@number", SqlValue.Int 1 ]   
+            [ "@number", SqlValue.Int 2 ]
+            [ "@number", SqlValue.Int 3 ]
+        ]
+
+        "UPDATE ... SET meta = @meta",  [
+           [ "@meta", SqlValue.String value ]
+        ] 
+   ]
+```
+
 ### Async: Execute a function with parameters
 ```fs
 /// Check whether or not a user exists by his username

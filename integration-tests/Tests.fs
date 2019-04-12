@@ -5,29 +5,71 @@ open Npgsql.FSharp
 
 printfn "Running Postgres integration tests"
 
-type Actor = {
-    Id : int
-    FirstName : string
-    LastName : string
-    LastUpdate : System.DateTime
+type FsTest = {
+    test_id: int
+    test_name: string
 }
+
+let execute name f = 
+    printfn ""
+    printfn " ============= Start %s =========== " name
+    printfn ""
+    try f()
+    with | ex -> 
+        printfn "Errored!!! '%s'" name
+        printfn "%A" ex
+    printfn ""
+    printfn " ============= End %s =========== " name
+    printfn ""
+    printfn ""
 
 let defaultConnection() =
     Sql.host "localhost"
     |> Sql.port 5432
     |> Sql.username "postgres"
     |> Sql.password "postgres"
-    |> Sql.database "dvdrental"
+    |> Sql.database "postgres"
     |> Sql.str
+
+let seedDefaultDatabase() = 
+    defaultConnection()
+    |> Sql.connect 
+    |> Sql.query "create table fsharp_tests (test_id int, test_name text)"
+    |> Sql.executeNonQuery 
+    |> ignore
+
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.executeTransaction [
+        "INSERT INTO fsharp_tests (test_id, test_name) values (@id, @name)", [
+            [ "@id", Sql.Value 1; "@name", Sql.Value "first test" ]
+            [ "@id", Sql.Value 2; "@name", Sql.Value "second test" ]
+            [ "@id", Sql.Value 3; "@name", Sql.Value "thrid test" ]
+        ]
+    ]
+    |> ignore
+
+let cleanupDefaultDatabase() = 
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "drop table if exists fsharp_tests"
+    |> Sql.executeNonQuery 
+    |> ignore 
+    
+execute "Database cleanup" cleanupDefaultDatabase
+
+execute "Seeding database" seedDefaultDatabase
 
 let handleInfinityConnection() =
     Sql.host "localhost"
     |> Sql.port 5432
     |> Sql.username "postgres"
     |> Sql.password "postgres"
-    |> Sql.database "dvdrental"
+    |> Sql.database "postgres"
     |> Sql.config "Convert Infinity DateTime=true;"
     |> Sql.str
+
+
 
 type OptionBuilder() =
     member x.Bind(v,f) = Option.bind f v
@@ -37,235 +79,192 @@ type OptionBuilder() =
 
 let option = OptionBuilder()
 
-defaultConnection()
-|> Sql.connect
-|> Sql.query "SELECT * FROM \"actor\""
-|> Sql.executeTable
-|> Sql.mapEachRow (function
-    | [ "Id", SqlValue.Int id
-        "UserName", SqlValue.String first_name
-        "Password", SqlValue.String last_name
-        "LastUpdate", SqlValue.Date last_update] ->
-        let user = { Id = id; FirstName = first_name; LastName = last_name; LastUpdate = last_update }
-        Some user
-    | _ -> None)
-|> List.iter (fun user -> printfn "User %s %s was found" user.FirstName user.LastName)
+execute "simple select and Sql.executeTable" <| fun _ ->
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "SELECT * FROM \"fsharp_tests\""
+    |> Sql.executeTable
+    |> List.iter (printfn "%A")
 
-defaultConnection()
-|> Sql.connect
-|> Sql.query "SELECT * FROM \"actor\""
-|> Sql.executeTable
-|> List.iter (printfn "%A")
+execute "Sql.mapEachRow" <| fun _ ->
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "SELECT * FROM \"fsharp_tests\""
+    |> Sql.prepare
+    |> Sql.executeTable
+    |> Sql.mapEachRow (fun row ->
+        option {
+            let! id = Sql.readInt "test_id" row
+            let! name = Sql.readString "test_name" row
+            return { test_id = id; test_name = name }
+        })
+    |> printfn "%A"
 
-
-defaultConnection()
-|> Sql.connect
-|> Sql.query "SELECT * FROM \"actor\""
-|> Sql.prepare
-|> Sql.executeTable
-|> Sql.mapEachRow (fun row ->
-    option {
-        let! id = Sql.readInt "actor_id" row
-        let! firstName = Sql.readString "first_name" row
-        let! lastName = Sql.readString "last_name" row
-        let! lastUpdate = Sql.readDate "last_update" row
-        return {
-            Id = id;
-            FirstName = firstName
-            LastName = lastName
-            LastUpdate = lastUpdate
-        }
-    })
-|> printfn "%A"
-
-defaultConnection()
-|> Sql.connect
-|> Sql.query "SELECT * FROM \"actor\""
-|> Sql.prepare
-|> Sql.executeReaderAsync (fun reader -> 
-    let row = Sql.readRow reader 
-    option {
-        let! id = Sql.readInt "actor_id" row
-        let! firstName = Sql.readString "first_name" row
-        let! lastName = Sql.readString "last_name" row
-        let! lastUpdate = Sql.readDate "last_update" row
-        return {
-            Id = id;
-            FirstName = firstName
-            LastName = lastName
-            LastUpdate = lastUpdate
-        }
-    })
-|> printfn "%A"
-
-defaultConnection()
-|> Sql.connect
-|> Sql.func "film_in_stock"
-|> Sql.parameters [ "p_film_id", Sql.Value 1; "p_store_id", Sql.Value 1]
-|> Sql.executeScalar
-|> function
-    | SqlValue.Int 1 -> printfn "Film in stock as expected"
-    | _ -> failwith "Expected result to be 1"
+  
+execute "Sql.executeReader" <| fun _ ->
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "SELECT * FROM \"fsharp_tests\""
+    |> Sql.prepare
+    |> Sql.executeReader (fun reader -> 
+        let row = Sql.readRow reader 
+        option {
+            let! id = Sql.readInt "test_id" row
+            let! name = Sql.readString "test_name" row
+            return { test_id = id; test_name = name }
+        })
+    |> printfn "%A"
 
 
-defaultConnection()
-|> Sql.connect
-|> Sql.func "film_in_stock"
-|> Sql.parameters  ["p_film_id", Sql.Value 1; "p_store_id", Sql.Value 42]
-|> Sql.executeScalar
-|> function
-    | SqlValue.Null ->  printfn "User was not found as expected"
-    | _ -> failwith "Table should not contain this '42' value"
+execute "Null roundtrip" <| fun _ ->
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "SELECT @nullValue"
+    |> Sql.parameters [ "nullValue", SqlValue.Null ]
+    |> Sql.executeScalar
+    |> function
+        | SqlValue.Null -> printfn "Succesfully returned null"
+        | otherwise -> printfn "Unexpected %A" otherwise
 
-printfn "Null roundtrip start"
+execute "Reading time" <| fun _ ->
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "SELECT NOW()"
+    |> Sql.executeScalar
+    |> Sql.toDateTime
+    |> printfn "%A"
 
-defaultConnection()
-|> Sql.connect
-|> Sql.query "SELECT @nullValue"
-|> Sql.parameters [ "nullValue", SqlValue.Null ]
-|> Sql.executeScalar
-|> function
-    | SqlValue.Null -> printfn "Succesfully returned null"
-    | otherwise -> printfn "Unexpected %A" otherwise
+execute "Sql.qeuryMany and Sql.executeMany" <| fun _ ->
+    let store = "SELECT * FROM \"fsharp_tests\""
 
-printfn "Null roundtrip end"
+    let storeMetadata =
+      Sql.multiline
+        ["select column_name, data_type"
+         "from information_schema.columns"
+         "where table_name = 'fsharp_tests'"]
 
-defaultConnection()
-|> Sql.connect
-|> Sql.query "SELECT NOW()"
-|> Sql.executeScalar
-|> Sql.toDateTime
-|> printfn "%A"
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.queryMany [store; storeMetadata]
+    |> Sql.executeMany
+    |> List.iter (fun table ->
+        printfn "Table:\n%A\n" table)
 
-let store = "SELECT * FROM \"store\""
-let storeMetadata =
-  Sql.multiline
-    ["select column_name, data_type"
-     "from information_schema.columns"
-     "where table_name = 'store'"]
-
-defaultConnection()
-|> Sql.connect
-|> Sql.queryMany [store; storeMetadata]
-|> Sql.executeMany
-|> List.iter (fun table ->
-    printfn "Table:\n%A\n" table)
-
-
-defaultConnection()
-|> Sql.connect
-|> Sql.query "CREATE EXTENSION IF NOT EXISTS hstore"
-|> Sql.executeNonQuery
-|> printfn "Create Extention hstore returned %A"
+execute "Enable hstore extension" <| fun _ ->
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "CREATE EXTENSION IF NOT EXISTS hstore"
+    |> Sql.executeNonQuery
+    |> printfn "Create Extention hstore returned %A"
 
 
 // Unhandled Exception: System.NotSupportedException: Npgsql 3.x removed support for writing a parameter with an IEnumerable value, use .ToList()/.ToArray() instead
 // Need to add a NpgsqlTypeHandler for Map ?
 
-// let inputMap =
-//     ["property", "value from F#"]
-//     |> Map.ofSeq
+execute "HStore roundtrip" <| fun _ -> 
+    let inputMap =
+        ["property", "value from F#"]
+        |> Map.ofSeq
 
-// printfn "HStore roundtrip start"
+    printfn "HStore roundtrip start"
 
-// defaultConnection()
-// |> Sql.connect
-// |> Sql.query "select @map"
-// |> Sql.parameters ["map", Sql.Value inputMap]
-// |> Sql.executeScalar
-// |> function
-//     | SqlValue.HStore map ->
-//         match Map.tryFind "property" map with
-//         | Some "value from F#" -> "Mapping HStore works"
-//         | _ -> "Something went wrong when reading HStore"
-//     | _ -> "Something went wrong when mapping HStore"
-// |> printfn "%A"
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "select @map"
+    |> Sql.parameters ["map", Sql.Value inputMap]
+    |> Sql.executeScalar
+    |> function
+        | SqlValue.HStore map ->
+            match Map.tryFind "property" map with
+            | Some "value from F#" -> "Mapping HStore works"
+            | _ -> "Something went wrong when reading HStore"
+        | _ -> "Something went wrong when mapping HStore"
+    |> printfn "%A"
 
 // printfn "HStore roundtrip end"
-let json_data = "value from F#"
-let inputJson = "{\"property\": \"" + json_data + "\"}"
+let jsonData = "value from F#"
+let inputJson = "{\"property\": \"" + jsonData + "\"}"
+execute "Jsonb roundtrip" <| fun _ ->
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "select @jsonb"
+    |> Sql.parameters ["jsonb", SqlValue.Jsonb inputJson]
+    |> Sql.executeScalar
+    |> function
+        | SqlValue.String json ->
+            match inputJson = json with
+            | true -> "Mapping Jsonb works, but you have to match SqlValue.String"
+            | _ -> sprintf "Something went wrong when reading Jsonb, expected %s but got %s" inputJson json
+        | x -> sprintf "Something went wrong when mapping Jsonb, %A" x
+    |> printfn "%A"
 
-printfn "Jsonb roundtrip start"
+execute "Create table with Jsonb data" <| fun _ ->
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "CREATE TABLE IF NOT EXISTS data_with_jsonb (data jsonb) "
+    |> Sql.executeNonQuery
+    |> printfn "Create Table data_with_jsonb returned %A"
 
-defaultConnection()
-|> Sql.connect
-|> Sql.query "select @jsonb"
-|> Sql.parameters ["jsonb", SqlValue.Jsonb inputJson]
-|> Sql.executeScalar
-|> function
-    | SqlValue.String json ->
-        match inputJson = json with
-        | true -> "Mapping Jsonb works, but you have to match SqlValue.String"
-        | _ -> sprintf "Something went wrong when reading Jsonb, expected %s but got %s" inputJson json
-    | x -> sprintf "Something went wrong when mapping Jsonb, %A" x
-|> printfn "%A"
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "INSERT INTO data_with_jsonb (data) VALUES (@jsonb)"
+    |> Sql.parameters ["jsonb", SqlValue.Jsonb inputJson]
+    |> Sql.executeNonQuery
+    |> printfn "Insert into data_with_jsonb returned %A"
 
-printfn "Jsonb roundtrip end"
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "SELECT data ->> 'property' FROM data_with_jsonb"
+    |> Sql.executeScalar
+    |> function
+        | SqlValue.String json ->
+            match jsonData = json with
+            | true -> sprintf "SELECT with json function works. Got *%s* as expected" json
+            | _ -> sprintf "Something went wrong when reading json, expected %s but got %s" jsonData json
+        | x -> sprintf "Something went wrong when mapping json, %A" x
+    |> printfn "%A"
 
-defaultConnection()
-|> Sql.connect
-|> Sql.query "CREATE TABLE IF NOT EXISTS data_with_jsonb (data jsonb) "
-|> Sql.executeNonQuery
-|> printfn "Create Table data_with_jsonb returned %A"
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "DROP TABLE data_with_jsonb"
+    |> Sql.executeNonQuery
+    |> printfn "Drop Table data_with_jsonb returned %A"
 
-defaultConnection()
-|> Sql.connect
-|> Sql.query "INSERT INTO data_with_jsonb (data) VALUES (@jsonb)"
-|> Sql.parameters ["jsonb", SqlValue.Jsonb inputJson]
-|> Sql.executeNonQuery
-|> printfn "Insert into data_with_jsonb returned %A"
 
-defaultConnection()
-|> Sql.connect
-|> Sql.query "SELECT data ->> 'property' FROM data_with_jsonb"
-|> Sql.executeScalar
-|> function
-    | SqlValue.String json ->
-        match json_data = json with
-        | true -> sprintf "SELECT with json function works. Got *%s* as expected" json
-        | _ -> sprintf "Something went wrong when reading json, expected %s but got %s" json_data json
-    | x -> sprintf "Something went wrong when mapping json, %A" x
-|> printfn "%A"
+execute "bytea roundtrip" <| fun _ ->
+    let bytesInput =
+        [1 .. 5]
+        |> List.map byte
+        |> Array.ofList
 
-defaultConnection()
-|> Sql.connect
-|> Sql.query "DROP TABLE data_with_jsonb"
-|> Sql.executeNonQuery
-|> printfn "Drop Table data_with_jsonb returned %A"
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "SELECT @manyBytes"
+    |> Sql.parameters [ "manyBytes", Sql.Value bytesInput ]
+    |> Sql.executeScalar
+    |> function
+        | SqlValue.Bytea output ->
+            if (output <> bytesInput)
+            then failwith "Bytea roundtrip failed, the output was different"
+            else printfn "Bytea roundtrip worked"
 
-let bytesInput =
-    [1 .. 5]
-    |> List.map byte
-    |> Array.ofList
+        | _ -> failwith "Bytea roundtrip failed"
 
-defaultConnection()
-|> Sql.connect
-|> Sql.query "SELECT @manyBytes"
-|> Sql.parameters [ "manyBytes", Sql.Value bytesInput ]
-|> Sql.executeScalar
-|> function
-    | SqlValue.Bytea output ->
-        if (output <> bytesInput)
-        then failwith "Bytea roundtrip failed, the output was different"
-        else printfn "Bytea roundtrip worked"
+execute "Uuid roundtrip" <| fun _ ->
+    let guid = System.Guid.NewGuid()
 
-    | _ -> failwith "Bytea roundtrip failed"
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "SELECT @uuid_input"
+    |> Sql.parameters [ "uuid_input", Sql.Value guid ]
+    |> Sql.executeScalar
+    |> function
+        | SqlValue.Uuid output ->
+            if (output.ToString() <> guid.ToString())
+            then failwith "Uuid roundtrip failed, the output was different"
+            else printfn "Uuid roundtrip worked"
 
-let guid = System.Guid.NewGuid()
-
-defaultConnection()
-|> Sql.connect
-|> Sql.query "SELECT @uuid_input"
-|> Sql.parameters [ "uuid_input", Sql.Value guid ]
-|> Sql.executeScalar
-|> function
-    | SqlValue.Uuid output ->
-        if (output.ToString() <> guid.ToString())
-        then failwith "Uuid roundtrip failed, the output was different"
-        else printfn "Uuid roundtrip worked"
-
-    | _ -> failwith "Uuid roundtrip failed"
-
+        | _ -> failwith "Uuid roundtrip failed"
 
 defaultConnection()
 |> Sql.connect
@@ -276,54 +275,60 @@ defaultConnection()
     | SqlValue.Decimal 12.5M -> printfn "Money as decimal roundtrip worked"
     | _ -> failwith "Money as decimal roundtrip failed"
 
+execute "uuid_generate_v4()" <| fun _ ->
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\""
+    |> Sql.executeNonQuery
+    |> printfn "Create Extention uuid-ossp returned %A"
 
-defaultConnection()
-|> Sql.connect
-|> Sql.query "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\""
-|> Sql.executeNonQuery
-|> printfn "Create Extention uuid-ossp returned %A"
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "SELECT uuid_generate_v4()"
+    |> Sql.executeScalar
+    |> function
+        | SqlValue.Uuid output -> printfn "Uuid generated: %A" output
+        | _ -> failwith "Uuid could not be read failed"
 
-defaultConnection()
-|> Sql.connect
-|> Sql.query "SELECT uuid_generate_v4()"
-|> Sql.executeScalar
-|> function
-    | SqlValue.Uuid output -> printfn "Uuid generated: %A" output
-    | _ -> failwith "Uuid could not be read failed"
+execute "test inifinity time" <| fun _ ->
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "CREATE TABLE IF NOT EXISTS data (version integer, date1 timestamptz, date2 timestamptz) "
+    |> Sql.executeNonQuery
+    |> printfn "Create Table data returned %A"
 
-defaultConnection()
-|> Sql.connect
-|> Sql.query "CREATE TABLE IF NOT EXISTS data (version integer, date1 timestamptz, date2 timestamptz) "
-|> Sql.executeNonQuery
-|> printfn "Create Table data returned %A"
+    let delete = "DELETE from data"
+    let insert = "INSERT INTO data (version, date1, date2) values (1, 'now', 'infinity')"
 
-let delete = "DELETE from data"
-let insert = "INSERT INTO data (version, date1, date2) values (1, 'now', 'infinity')"
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.queryMany [ delete; insert ]
+    |> Sql.executeMany
+    |> printfn "Insert into Table data returned %A"
 
-defaultConnection()
-|> Sql.connect
-|> Sql.queryMany [ delete; insert ]
-|> Sql.executeMany
-|> printfn "Insert into Table data returned %A"
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "SELECT * FROM data"
+    |> Sql.executeTableSafe
+    |> function
+        | Ok _ -> failwith "Should be able to convert infinity to datetime"
+        | Error ex -> printfn "Fails as expected with %A" ex.Message
 
-defaultConnection()
-|> Sql.connect
-|> Sql.query "SELECT * FROM data"
-|> Sql.executeTableSafe
-|> function
-    | Ok _ -> failwith "Should be able to convert infinity to datetime"
-    | Error ex -> printfn "Fails as expected with %A" ex.Message
-
-handleInfinityConnection()
-|> Sql.connect
-|> Sql.query "SELECT * FROM data"
-|> Sql.executeTableSafe
-|> function
-    | Ok r -> printfn "Succeed as expected : %A vs %A" (r.Head.Item 2) System.DateTime.MaxValue
-    | Error _ -> failwith "Should not fail"
+execute "Handle infinity connection" <| fun _ ->
+    handleInfinityConnection()
+    |> Sql.connect
+    |> Sql.query "SELECT * FROM data"
+    |> Sql.executeTableSafe
+    |> function
+        | Ok r -> printfn "Succeed as expected : %A vs %A" (r.Head.Item 2) System.DateTime.MaxValue
+        | Error err -> 
+            printfn "%A" err
+            failwith "Should not fail"
 
 defaultConnection()
 |> Sql.connect
 |> Sql.query "DROP TABLE data"
 |> Sql.executeNonQuery
 |> printfn "Drop Table data returned %A"
+
+cleanupDefaultDatabase()
