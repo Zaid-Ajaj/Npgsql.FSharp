@@ -444,11 +444,18 @@ module Sql =
         use transaction = connection.BeginTransaction()
         let affectedRowsByQuery = ResizeArray<int>()
         for (query, parameterSets) in queries do
-            for parameterSet in parameterSets do
+            if List.isEmpty parameterSets 
+            then 
+               use command = new NpgsqlCommand(query, connection, transaction)
+               let affectedRows = command.ExecuteNonQuery() 
+               affectedRowsByQuery.Add affectedRows
+            else
+              for parameterSet in parameterSets do
                 use command = new NpgsqlCommand(query, connection, transaction)
                 populateRow command parameterSet
                 let affectedRows = command.ExecuteNonQuery() 
                 affectedRowsByQuery.Add affectedRows
+        
         transaction.Commit()
         List.ofSeq affectedRowsByQuery
 
@@ -463,7 +470,13 @@ module Sql =
             use transaction = connection.BeginTransaction()
             let affectedRowsByQuery = ResizeArray<int>()
             for (query, parameterSets) in queries do
-                for parameterSet in parameterSets do
+                if List.isEmpty parameterSets 
+                then 
+                  use command = new NpgsqlCommand(query, connection, transaction)
+                  let! affectedRows = Async.AwaitTask (command.ExecuteNonQueryAsync token) 
+                  affectedRowsByQuery.Add affectedRows
+                else
+                  for parameterSet in parameterSets do
                     use command = new NpgsqlCommand(query, connection, transaction)
                     populateRow command parameterSet
                     let! affectedRows = Async.AwaitTask (command.ExecuteNonQueryAsync token) 
@@ -490,11 +503,17 @@ module Sql =
             use transaction = connection.BeginTransaction()
             let affectedRowsByQuery = ResizeArray<int>()
             for (query, parameterSets) in queries do
-                for parameterSet in parameterSets do
-                    use command = new NpgsqlCommand(query, connection, transaction)
-                    populateRow command parameterSet
-                    let affectedRows = command.ExecuteNonQuery() 
-                    affectedRowsByQuery.Add affectedRows
+                if List.isEmpty parameterSets 
+                then 
+                   use command = new NpgsqlCommand(query, connection, transaction)
+                   let affectedRows = command.ExecuteNonQuery() 
+                   affectedRowsByQuery.Add affectedRows
+                else
+                  for parameterSet in parameterSets do
+                      use command = new NpgsqlCommand(query, connection, transaction)
+                      populateRow command parameterSet
+                      let affectedRows = command.ExecuteNonQuery() 
+                      affectedRowsByQuery.Add affectedRows
             transaction.Commit()
             Ok (List.ofSeq affectedRowsByQuery)
         with 
@@ -513,7 +532,7 @@ module Sql =
         while reader.Read() do result.Add (read postgresReader) 
         List.choose id (List.ofSeq result) 
 
-    let executeReaderSafe (props: SqlProps) (read: NpgsqlDataReader -> Option<'t>) = 
+    let executeReaderSafe (read: NpgsqlDataReader -> Option<'t>) (props: SqlProps)  = 
         try
           if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
           use connection = newConnection props
