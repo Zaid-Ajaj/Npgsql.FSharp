@@ -345,8 +345,12 @@ module Sql =
             while !canRead do 
                 let! readerAvailable = reader.ReadAsync(cancellationToken)
                 canRead := readerAvailable
-                let! row = readRowTaskCt cancellationToken reader
-                rows.Add (List.ofArray row)
+                
+                if readerAvailable then 
+                    let! row = readRowTaskCt cancellationToken reader
+                    rows.Add (List.ofArray row)
+                else
+                    ()
             
             return List.ofArray (rows.ToArray())
         }
