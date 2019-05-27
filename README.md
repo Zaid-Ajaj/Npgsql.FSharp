@@ -283,7 +283,8 @@ Though watch out, as this is a relatively new feature and still needs some time 
 * Fields' names must match exactly columns headers.
 * Only simple types are supported (see the definition of the "Sql" type).
 * You can turn a field into an option if it's defined as "Nullable" in your table:
-```
+
+```fs
 type User = {
     UserId : int
     FirstName : string
