@@ -41,6 +41,11 @@ let defaultConnection : string =
     |> Sql.database "app_db"
     |> Sql.config "SslMode=Require;" // optional Config for connection string
     |> Sql.str
+
+// construct connection string from postgres Uri
+// NOTE: query string parameters are not converted
+let defaultConnection : string =
+    Sql.fromUri (Uri "postgresql://user:password@localhost:5432/app_db")
 ```
 
 ### Execute query and read results as table then map the results
@@ -73,14 +78,14 @@ let getAllUsers() : User list =
     defaultConnection
     |> Sql.connect
     |> Sql.query "SELECT * FROM \"users\""
-    |> Sql.executeTable 
+    |> Sql.executeTable
     |> Sql.mapEachRow (fun row ->
         option {
-            let! id = Sql.readInt "user_id" row 
-            let! fname = Sql.readString "first_name" row 
+            let! id = Sql.readInt "user_id" row
+            let! fname = Sql.readString "first_name" row
             let! lname = Sql.readString "last_name" row
             return { Id = id; FirstName = fname; LastName = lname }
-        }) 
+        })
 ```
 ### Deal with null values and provide defaults
 Notice we are not using `let bang` but just `let` instead
@@ -90,18 +95,18 @@ let getAllUsers() : User list =
     defaultConnection
     |> Sql.connect
     |> Sql.query "SELECT * FROM \"users\""
-    |> Sql.executeTable 
+    |> Sql.executeTable
     |> Sql.mapEachRow (fun row ->
         option {
-            let! id = Sql.readInt "user_id" row 
-            let fname = Sql.readString "first_name" row 
+            let! id = Sql.readInt "user_id" row
+            let fname = Sql.readString "first_name" row
             let lname = Sql.readString "last_name" row
-            return { 
-                Id = id; 
-                FirstName = defaultArg fname ""  
-                LastName = defaultArg lname "" 
+            return {
+                Id = id;
+                FirstName = defaultArg fname ""
+                LastName = defaultArg lname ""
             }
-        }) 
+        })
 ```
 ### Use `NpgsqlDataReader` instead of creating intermediate table for lower memory footprint
 ```fsharp
@@ -109,18 +114,18 @@ let getAllUsers() : User list =
     defaultConnection
     |> Sql.connect
     |> Sql.query "SELECT * FROM \"users\""
-    |> Sql.executeReader (fun reader -> 
+    |> Sql.executeReader (fun reader ->
         let row = Sql.readRow reader
         option {
-            let! id = Sql.readInt "user_id" row 
-            let fname = Sql.readString "first_name" row 
+            let! id = Sql.readInt "user_id" row
+            let fname = Sql.readString "first_name" row
             let lname = Sql.readString "last_name" row
-            return { 
-                Id = id; 
-                FirstName = defaultArg fname ""  
-                LastName = defaultArg lname "" 
+            return {
+                Id = id;
+                FirstName = defaultArg fname ""
+                LastName = defaultArg lname ""
             }
-        }) 
+        })
 ```
 the library doesn't provide an `option` monad by default, you add your own or use this simple one instead:
 ```fs
@@ -151,14 +156,14 @@ connectionString
 |> Sql.executeTransaction // SqlProps -> int list
     [
         "INSERT INTO ... VALUES (@number)", [
-            [ "@number", SqlValue.Int 1 ]   
+            [ "@number", SqlValue.Int 1 ]
             [ "@number", SqlValue.Int 2 ]
             [ "@number", SqlValue.Int 3 ]
         ]
 
         "UPDATE ... SET meta = @meta",  [
            [ "@meta", SqlValue.String value ]
-        ] 
+        ]
    ]
 ```
 
