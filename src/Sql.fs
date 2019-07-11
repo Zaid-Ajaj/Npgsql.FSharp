@@ -409,8 +409,8 @@ module Sql =
         use connection = newConnection props
         connection.Open()
         use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
-        if props.NeedPrepare then command.Prepare()
         populateCmd command props
+        if props.NeedPrepare then command.Prepare()
         use reader = command.ExecuteReader()
         readTable reader
 
@@ -424,8 +424,8 @@ module Sql =
             use connection = newConnection props
             do! connection.OpenAsync(cancellationToken)
             use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
-            if props.NeedPrepare then command.Prepare()
             do populateCmd command props
+            if props.NeedPrepare then command.Prepare()
             use! reader = command.ExecuteReaderAsync(cancellationToken)
             return! readTableTaskCt cancellationToken (reader |> unbox<NpgsqlDataReader>)
         }
@@ -530,8 +530,8 @@ module Sql =
         use connection = newConnection props
         connection.Open()
         use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
-        if props.NeedPrepare then command.Prepare()
         do populateCmd command props
+        if props.NeedPrepare then command.Prepare()
         use reader = command.ExecuteReader()
         let postgresReader = unbox<NpgsqlDataReader> reader
         let result = ResizeArray<'t option>()
@@ -544,8 +544,8 @@ module Sql =
           use connection = newConnection props
           connection.Open()
           use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
-          if props.NeedPrepare then command.Prepare()
           do populateCmd command props
+          if props.NeedPrepare then command.Prepare()
           use reader = command.ExecuteReader()
           let postgresReader = unbox<NpgsqlDataReader> reader
           let result = ResizeArray<'t option>()
@@ -560,8 +560,8 @@ module Sql =
             use connection = newConnection props
             do! connection.OpenAsync(cancellationToken)
             use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
-            if props.NeedPrepare then command.Prepare()
             do populateCmd command props
+            if props.NeedPrepare then command.Prepare()
             use! reader = command.ExecuteReaderAsync(cancellationToken)
             let postgresReader = unbox<NpgsqlDataReader> reader
             let result = ResizeArray<'t option>()
@@ -592,8 +592,8 @@ module Sql =
                 use connection = newConnection props
                 do! connection.OpenAsync(cancellationToken)
                 use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
-                if props.NeedPrepare then command.Prepare()
                 do populateCmd command props
+                if props.NeedPrepare then command.Prepare()
                 use! reader = command.ExecuteReaderAsync(cancellationToken)
                 let postgresReader = unbox<NpgsqlDataReader> reader
                 let result = ResizeArray<'t option>()
@@ -625,8 +625,8 @@ module Sql =
                 use connection = newConnection props
                 do! connection.OpenAsync(cancellationToken)
                 use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
-                if props.NeedPrepare then command.Prepare()
                 do populateCmd command props
+                if props.NeedPrepare then command.Prepare()
                 use! reader = command.ExecuteReaderAsync(cancellationToken)
                 let! result = readTableTaskCt cancellationToken (reader |> unbox<NpgsqlDataReader>)
                 return Ok (result)
@@ -687,8 +687,8 @@ module Sql =
         use connection = newConnection props
         connection.Open()
         use command = new NpgsqlCommand(singleQuery, connection)
-        if props.NeedPrepare then command.Prepare()
         populateCmd command props
+        if props.NeedPrepare then command.Prepare()
         use reader = command.ExecuteReader()
         [ for _ in 1 .. queryCount do
             yield readTable reader
@@ -699,8 +699,8 @@ module Sql =
         use connection = newConnection props
         connection.Open()
         use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
-        if props.NeedPrepare then command.Prepare()
         populateCmd command props
+        if props.NeedPrepare then command.Prepare()
         command.ExecuteScalar()
         |> readValue None
 
@@ -710,8 +710,8 @@ module Sql =
         use connection = newConnection props
         connection.Open()
         use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
-        if props.NeedPrepare then command.Prepare()
         populateCmd command props
+        if props.NeedPrepare then command.Prepare()
         command.ExecuteNonQuery()
 
     /// Executes the query safely (does not throw) and returns the number of rows affected
@@ -725,8 +725,8 @@ module Sql =
             use connection = newConnection props
             do! connection.OpenAsync(cancellationToken)
             use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
-            if props.NeedPrepare then command.Prepare()
             do populateCmd command props
+            if props.NeedPrepare then command.Prepare()
             return! command.ExecuteNonQueryAsync(cancellationToken)
         }
 
@@ -750,8 +750,8 @@ module Sql =
                 use connection = newConnection props
                 do! connection.OpenAsync(cancellationToken)
                 use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
-                if props.NeedPrepare then command.Prepare()
                 do populateCmd command props
+                if props.NeedPrepare then command.Prepare()
                 let! result = command.ExecuteNonQueryAsync(cancellationToken)
                 return Ok (result)
             with
@@ -783,8 +783,8 @@ module Sql =
             use connection = newConnection props
             do! connection.OpenAsync(cancellationToken)
             use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
-            if props.NeedPrepare then command.Prepare()
             do populateCmd command props
+            if props.NeedPrepare then command.Prepare()
             let! value = command.ExecuteScalarAsync(cancellationToken)
             return readValue None value
         }
@@ -806,8 +806,8 @@ module Sql =
                 use connection = newConnection props
                 do! connection.OpenAsync(cancellationToken)
                 use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
-                if props.NeedPrepare then command.Prepare()
                 do populateCmd command props
+                if props.NeedPrepare then command.Prepare()
                 let! value = command.ExecuteScalarAsync(cancellationToken)
                 return Ok (readValue None value)
             with
@@ -832,8 +832,8 @@ module Sql =
             use connection = newConnection props
             do! connection.OpenAsync()
             use command = new NpgsqlCommand(singleQuery, connection)
-            if props.NeedPrepare then command.Prepare()
             populateCmd command props
+            if props.NeedPrepare then command.Prepare()
             use! reader = command.ExecuteReaderAsync()
             let pgreader = reader :?> NpgsqlDataReader
             let rec loop acc = task {
