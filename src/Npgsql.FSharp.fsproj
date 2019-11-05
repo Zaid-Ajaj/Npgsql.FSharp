@@ -9,9 +9,10 @@
     <PackageTags>fsharp;postgres;sql;ngpsql</PackageTags>
     <Authors>Zaid Ajaj</Authors>
     <Version>1.11.1</Version>
-    <TargetFrameworks>netstandard2.0;net461</TargetFrameworks>
+    <TargetFrameworks>netstandard2.0;net461;netcoreapp3.0</TargetFrameworks>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <LangVersion>latest</LangVersion>
+    <PackageReleaseNotes>Add SqlValue.Time to accept System.TimeSpan</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
