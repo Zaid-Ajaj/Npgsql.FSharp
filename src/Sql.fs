@@ -37,6 +37,7 @@ type Sql() =
     static member Value(value: Guid) = SqlValue.Uuid value
     static member Value(bytea: byte[]) = SqlValue.Bytea bytea
     static member Value(map: Map<string, string>) = SqlValue.HStore map
+    static member Value(value: TimeSpan) = SqlValue.Time value
 
 [<RequireQualifiedAccess>]
 module Sql =
@@ -143,6 +144,14 @@ module Sql =
             | Some (SqlValue.Date value) -> Some value
             | _ -> None
 
+    let readTime name (row: SqlRow) =
+        row
+        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> Option.map snd
+        |> function
+            | Some (SqlValue.Time value) -> Some value
+            | _ -> None             
+
     let readBool name (row: SqlRow) =
         row
         |> List.tryFind (fun (colName, value) -> colName = name)
@@ -210,6 +219,10 @@ module Sql =
     let toDateTime = function
         | SqlValue.Date x -> x
         | value -> failwithf "Could not convert %A into a DateTime" value
+
+    let toTime = function
+        | SqlValue.Time x -> x
+        | value -> failwithf "Could not convert %A into a TimeSpan" value        
 
     let toFloat = function
         | SqlValue.Number x -> x
@@ -290,6 +303,7 @@ module Sql =
             |> SqlValue.HStore
         | null -> SqlValue.Null
         | :? System.DBNull -> SqlValue.Null
+        | :? TimeSpan as x -> SqlValue.Time x
         | other ->
             let typeName = (other.GetType()).FullName
             match columnName with
@@ -390,6 +404,7 @@ module Sql =
                   |> Dictionary
                 upcast value, None
             | SqlValue.Jsonb x -> upcast x, Some NpgsqlTypes.NpgsqlDbType.Jsonb
+            | SqlValue.Time x -> upcast x, None
 
           let paramName =
             if not (paramName.StartsWith "@")
@@ -660,6 +675,7 @@ module Sql =
     | SqlValue.TimeWithTimeZone g -> box g
     | SqlValue.Null -> null
     | SqlValue.Jsonb s -> box s
+    | SqlValue.Time t -> box t
 
     let private valueAsOptionalObject = function
     | SqlValue.Short value -> box (Some value)
@@ -676,6 +692,7 @@ module Sql =
     | SqlValue.TimeWithTimeZone value -> box (Some value)
     | SqlValue.Null -> box (None)
     | SqlValue.Jsonb value -> box (Some value)
+    | SqlValue.Time value -> box (Some value)
 
     let multiline xs = String.concat Environment.NewLine xs
 

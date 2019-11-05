@@ -18,6 +18,7 @@ type SqlValue =
     | Uuid of Guid
     | TimeWithTimeZone of DateTimeOffset
     | Jsonb of string
+    | Time of TimeSpan
 
 type SqlRow = list<string * SqlValue>
 
