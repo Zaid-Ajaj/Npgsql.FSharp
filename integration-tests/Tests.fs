@@ -1,6 +1,7 @@
 module Main
 
 open Npgsql.FSharp
+open System
 
 
 printfn "Running Postgres integration tests"
@@ -8,6 +9,11 @@ printfn "Running Postgres integration tests"
 type FsTest = {
     test_id: int
     test_name: string
+}
+
+type TimeSpanTest = {
+    id: int
+    at: TimeSpan
 }
 
 let execute name f = 
@@ -324,6 +330,64 @@ execute "Handle infinity connection" <| fun _ ->
         | Error err -> 
             printfn "%A" err
             failwith "Should not fail"
+
+execute "Handle TimeSpan" <| fun _ ->
+    defaultConnection()
+    |> Sql.connect 
+    |> Sql.query "create table if not exists timespan_test (id int, at time without time zone)"
+    |> Sql.executeNonQuery 
+    |> ignore
+
+    let t1 = TimeSpan(13, 45, 23)
+    let t2 = TimeSpan(16, 17, 09)
+    let t3 = TimeSpan(20, 02, 56)
+
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.executeTransaction [
+        "INSERT INTO timespan_test (id, at) values (@id, @at)", [
+            [ "@id", Sql.Value 1; "@at", Sql.Value t1 ]
+            [ "@id", Sql.Value 2; "@at", Sql.Value t2 ]
+            [ "@id", Sql.Value 3; "@at", Sql.Value t3 ]
+        ]
+    ]
+    |> ignore
+
+    // Use `parseEachRow<T>`
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "SELECT * FROM timespan_test"
+    |> Sql.executeTable
+    |> Sql.parseEachRow<TimeSpanTest>
+    |> printfn "TimeSpan records: %A"
+
+    // Use `mapEachRow` + `readTime`
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "SELECT * FROM timespan_test"
+    |> Sql.prepare
+    |> Sql.executeTable
+    |> Sql.mapEachRow (fun row ->
+        option {
+            let! id = Sql.readInt "id" row
+            let! at = Sql.readTime "at" row
+            return { id = id; at = at }
+        })
+    |> ignore  
+
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "drop table if exists timespan_test"
+    |> Sql.executeNonQuery 
+    |> ignore
+
+execute "Local UTC time" <| fun _ ->
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "SELECT localtime"
+    |> Sql.executeScalar
+    |> Sql.toTime
+    |> printfn "%A"            
 
 defaultConnection()
 |> Sql.connect
