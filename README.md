@@ -6,6 +6,7 @@ This wrapper maps *raw* SQL data from the database into the `Sql` data structure
 
 Given the types:
 ```fs
+[<RequireQualifiedAccess>]
 type SqlValue =
     | Null
     | Short of int16
@@ -21,6 +22,7 @@ type SqlValue =
     | Uuid of Guid
     | TimeWithTimeZone of DateTimeOffset
     | Jsonb of string
+    | Time of TimeSpan
 
 // A row is a list of key/value pairs
 type SqlRow = list<string * SqlValue>
@@ -32,51 +34,57 @@ type SqlTable = list<SqlRow>
 ```fs
 open Npgsql.FSharp
 
-// construct the connection string
-let defaultConnection : string =
+// construct the connection configuration
+let defaultConnection  =
     Sql.host "localhost"
     |> Sql.port 5432
     |> Sql.username "user"
     |> Sql.password "password"
     |> Sql.database "app_db"
-    |> Sql.config "SslMode=Require;" // optional Config for connection string
+    |> Sql.sslMode SslMode.Require
+    |> Sql.config "Pooling=true" // optional Config for connection string
+
+// You can get the connection string from the config by calling `Sql.str`
+let connectionString =
+    defaultConnection
     |> Sql.str
 
 // construct connection string from postgres Uri
 // NOTE: query string parameters are not converted
 let defaultConnection : string =
     Sql.fromUri (Uri "postgresql://user:password@localhost:5432/app_db")
+
+// Construct parts of the connection config from the Uri
+// and add more from the `Sql` module. For example to connect to Heroku Postgres databases, you do the following
+// NOTE: query string parameters are not converted
+let herokuConfig : string =
+    Sql.fromUriToConfig (Uri "postgresql://user:password@localhost:5432/app_db")
+    |> Sql.sslMode SslMode.Require
+    |> Sql.trustServerCertificate true
+    |> Sql.string
 ```
+### Sql.connect vs Sql.connectFromConfig
+
+The function `Sql.connect` takes a connection string as input, for example if you have it configured as an environment variable.
+
+However, `Sql.connectFromConfig` takes the connection string *builder* if you are configuring the connection string from code.
+
+`Sql.connectFromConfig` will internally call `Sql.connect (Sql.str inputConfig)`
 
 ### Execute query and read results as table then map the results
 ```fs
+open Npgsql.FSharp
+open Npgsql.FSharp.OptionWorkflow
+
 type User = {
-    UserId : int
+    Id: int
     FirstName: string
     LastName: string
 }
 
 let getAllUsers() : User list =
     defaultConnection
-    |> Sql.connect
-    |> Sql.query "SELECT * FROM \"users\""
-    |> Sql.executeTable
-    |> Sql.mapEachRow (function
-        | [ "user_id", SqlValue.Int id
-            "first_name", SqlValue.String fname
-            "last_name", SqlValue.String lname ] ->
-          let user =
-            { UserId = id;
-              FirstName = fname;
-              LastName = lname }
-          Some user
-        | _ -> None)
-```
-### Use option monad for reading row values:
-```fs
-let getAllUsers() : User list =
-    defaultConnection
-    |> Sql.connect
+    |> Sql.connectFromConfig
     |> Sql.query "SELECT * FROM \"users\""
     |> Sql.executeTable
     |> Sql.mapEachRow (fun row ->
@@ -94,7 +102,7 @@ Notice we are not using `let bang` but just `let` instead
 let getAllUsers() : User list =
     defaultConnection
     |> Sql.connect
-    |> Sql.query "SELECT * FROM \"users\""
+    |> Sql.query "SELECT * FROM users"
     |> Sql.executeTable
     |> Sql.mapEachRow (fun row ->
         option {
@@ -108,7 +116,7 @@ let getAllUsers() : User list =
             }
         })
 ```
-### Use `NpgsqlDataReader` instead of creating intermediate table for lower memory footprint
+### Use `Sql.executeReader` instead of creating intermediate table for lower memory footprint
 ```fsharp
 let getAllUsers() : User list =
     defaultConnection
@@ -126,16 +134,6 @@ let getAllUsers() : User list =
                 LastName = defaultArg lname ""
             }
         })
-```
-the library doesn't provide an `option` monad by default, you add your own or use this simple one instead:
-```fs
-type OptionBuilder() =
-    member x.Bind(v,f) = Option.bind f v
-    member x.Return v = Some v
-    member x.ReturnFrom o = o
-    member x.Zero () = None
-
-let option = OptionBuilder()
 ```
 ### Execute a function with parameters
 ```fs

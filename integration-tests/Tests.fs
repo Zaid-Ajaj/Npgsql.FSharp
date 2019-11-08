@@ -1,8 +1,8 @@
 module Main
 
 open Npgsql.FSharp
+open Npgsql.FSharp.OptionWorkflow
 open System
-
 
 printfn "Running Postgres integration tests"
 
@@ -16,12 +16,12 @@ type TimeSpanTest = {
     at: TimeSpan
 }
 
-let execute name f = 
+let execute name f =
     printfn ""
     printfn " ============= Start %s =========== " name
     printfn ""
     try f()
-    with | ex -> 
+    with | ex ->
         printfn "Errored!!! '%s'" name
         printfn "%A" ex
     printfn ""
@@ -37,11 +37,20 @@ let defaultConnection() =
     |> Sql.database "postgres"
     |> Sql.str
 
-let seedDefaultDatabase() = 
+let config() =
+    Sql.host "localhost"
+    |> Sql.port 5432
+    |> Sql.username "postgres"
+    |> Sql.password "postgres"
+    |> Sql.database "postgres"
+    |> Sql.sslMode SslMode.Require
+    |> Sql.trustServerCertificate true
+
+let seedDefaultDatabase() =
     defaultConnection()
-    |> Sql.connect 
+    |> Sql.connect
     |> Sql.query "create table fsharp_tests (test_id int, test_name text)"
-    |> Sql.executeNonQuery 
+    |> Sql.executeNonQuery
     |> ignore
 
     defaultConnection()
@@ -55,13 +64,13 @@ let seedDefaultDatabase() =
     ]
     |> ignore
 
-let cleanupDefaultDatabase() = 
+let cleanupDefaultDatabase() =
     defaultConnection()
     |> Sql.connect
     |> Sql.query "drop table if exists fsharp_tests"
-    |> Sql.executeNonQuery 
-    |> ignore 
-    
+    |> Sql.executeNonQuery
+    |> ignore
+
 execute "Database cleanup" cleanupDefaultDatabase
 
 execute "Seeding database" seedDefaultDatabase
@@ -72,30 +81,20 @@ let handleInfinityConnection() =
     |> Sql.username "postgres"
     |> Sql.password "postgres"
     |> Sql.database "postgres"
-    |> Sql.config "Convert Infinity DateTime=true;"
+    |> Sql.convertInfinityDateTime true
     |> Sql.str
-
-
-
-type OptionBuilder() =
-    member x.Bind(v,f) = Option.bind f v
-    member x.Return v = Some v
-    member x.ReturnFrom o = o
-    member x.Zero () = None
-
-let option = OptionBuilder()
 
 execute "simple select and Sql.executeTable" <| fun _ ->
     defaultConnection()
     |> Sql.connect
-    |> Sql.query "SELECT * FROM \"fsharp_tests\""
+    |> Sql.query "SELECT * FROM fsharp_tests"
     |> Sql.executeTable
     |> List.iter (printfn "%A")
 
 execute "Sql.mapEachRow" <| fun _ ->
     defaultConnection()
     |> Sql.connect
-    |> Sql.query "SELECT * FROM \"fsharp_tests\""
+    |> Sql.query "SELECT * FROM fsharp_tests"
     |> Sql.prepare
     |> Sql.executeTable
     |> Sql.mapEachRow (fun row ->
@@ -106,14 +105,14 @@ execute "Sql.mapEachRow" <| fun _ ->
         })
     |> printfn "%A"
 
-  
+
 execute "Sql.executeReader" <| fun _ ->
     defaultConnection()
     |> Sql.connect
-    |> Sql.query "SELECT * FROM \"fsharp_tests\""
+    |> Sql.query "SELECT * FROM fsharp_tests"
     |> Sql.prepare
-    |> Sql.executeReader (fun reader -> 
-        let row = Sql.readRow reader 
+    |> Sql.executeReader (fun reader ->
+        let row = Sql.readRow reader
         option {
             let! id = Sql.readInt "test_id" row
             let! name = Sql.readString "test_name" row
@@ -141,7 +140,7 @@ execute "Reading time" <| fun _ ->
     |> printfn "%A"
 
 execute "Sql.qeuryMany and Sql.executeMany" <| fun _ ->
-    let store = "SELECT * FROM \"fsharp_tests\""
+    let store = "SELECT * FROM fsharp_tests"
 
     let storeMetadata =
       Sql.multiline
@@ -167,7 +166,7 @@ execute "Enable hstore extension" <| fun _ ->
 // Unhandled Exception: System.NotSupportedException: Npgsql 3.x removed support for writing a parameter with an IEnumerable value, use .ToList()/.ToArray() instead
 // Need to add a NpgsqlTypeHandler for Map ?
 
-execute "HStore roundtrip" <| fun _ -> 
+execute "HStore roundtrip" <| fun _ ->
     let inputMap =
         ["property", "value from F#"]
         |> Map.ofSeq
@@ -327,15 +326,15 @@ execute "Handle infinity connection" <| fun _ ->
     |> Sql.executeTableSafe
     |> function
         | Ok r -> printfn "Succeed as expected : %A vs %A" (r.Head.Item 2) System.DateTime.MaxValue
-        | Error err -> 
+        | Error err ->
             printfn "%A" err
             failwith "Should not fail"
 
 execute "Handle TimeSpan" <| fun _ ->
     defaultConnection()
-    |> Sql.connect 
+    |> Sql.connect
     |> Sql.query "create table if not exists timespan_test (id int, at time without time zone)"
-    |> Sql.executeNonQuery 
+    |> Sql.executeNonQuery
     |> ignore
 
     let t1 = TimeSpan(13, 45, 23)
@@ -373,12 +372,12 @@ execute "Handle TimeSpan" <| fun _ ->
             let! at = Sql.readTime "at" row
             return { id = id; at = at }
         })
-    |> ignore  
+    |> ignore
 
     defaultConnection()
     |> Sql.connect
     |> Sql.query "drop table if exists timespan_test"
-    |> Sql.executeNonQuery 
+    |> Sql.executeNonQuery
     |> ignore
 
 execute "Local UTC time" <| fun _ ->
@@ -387,7 +386,7 @@ execute "Local UTC time" <| fun _ ->
     |> Sql.query "SELECT localtime"
     |> Sql.executeScalar
     |> Sql.toTime
-    |> printfn "%A"            
+    |> printfn "%A"
 
 defaultConnection()
 |> Sql.connect

@@ -1,21 +1,29 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Description>Thin F# wrapper around Npgsql, the PostgreSQL database driver.</Description>
+    <Description>Thin functional F# layer around Npgsql, the PostgreSQL database driver.</Description>
     <PackageProjectUrl>https://github.com/Zaid-Ajaj/Npgsql.FSharp</PackageProjectUrl>
     <RepositoryUrl>https://github.com/Zaid-Ajaj/Npgsql.FSharp.git</RepositoryUrl>
     <PackageLicenseUrl>https://github.com/Zaid-Ajaj/Npgsql.FSharp/blob/master/LICENSE</PackageLicenseUrl>
     <PackageIconUrl></PackageIconUrl>
     <PackageTags>fsharp;postgres;sql;ngpsql</PackageTags>
     <Authors>Zaid Ajaj</Authors>
-    <Version>1.11.1</Version>
+    <Version>1.12.0</Version>
     <TargetFrameworks>netstandard2.0;net461;netcoreapp3.0</TargetFrameworks>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <LangVersion>latest</LangVersion>
-    <PackageReleaseNotes>Add SqlValue.Time to accept System.TimeSpan</PackageReleaseNotes>
+    <PackageReleaseNotes>
+      Add Sql.fromUriToConfig
+      Add Sql.connectFromConfig
+      Add Sql.sslMode config
+      Add Sql.trustServerCertificate config
+      Add Sql.convertInfinityDateTime config
+      Add built-in option monad
+    </PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="OptionWorkflow.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="PostgresUri.fs" />
     <Compile Include="Sql.fs" />

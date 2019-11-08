@@ -39,18 +39,35 @@ type Sql() =
     static member Value(map: Map<string, string>) = SqlValue.HStore map
     static member Value(value: TimeSpan) = SqlValue.Time value
 
+/// Specifies how to manage SSL.
+[<RequireQualifiedAccess>]
+type SslMode =
+    /// SSL is disabled. If the server requires SSL, the connection will fail.
+    | Disable
+    /// Prefer SSL connections if the server allows them, but allow connections without SSL.
+    | Prefer
+    /// Fail the connection if the server doesn't support SSL.
+    | Require
+    with
+      member this.Serialize() =
+        match this with
+        | Disable -> "Disable"
+        | Prefer -> "Prefer"
+        | Require -> "Require"
+
 [<RequireQualifiedAccess>]
 module Sql =
-
     type ConnectionStringBuilder = private {
         Host: string
         Database: string
-        Username: string
-        Password: string
-        Port: int
-        Config : string
+        Username: string option
+        Password: string option
+        Port: int option
+        Config : string option
+        SslMode : SslMode option
+        TrustServerCertificate : bool option
+        ConvertInfinityDateTime : bool option
     }
-
 
     type SqlProps = private {
         ConnectionString : string
@@ -62,13 +79,17 @@ module Sql =
     }
 
     let private defaultConString() : ConnectionStringBuilder = {
-            Host = ""
-            Database = ""
-            Username = ""
-            Password = ""
-            Port = 5432
-            Config = ""
+        Host = ""
+        Database = ""
+        Username = None
+        Password = None
+        Port = Some 5432
+        Config = None
+        SslMode = None
+        TrustServerCertificate = None
+        ConvertInfinityDateTime = None
     }
+
     let private defaultProps() = {
         ConnectionString = "";
         SqlQuery = [];
@@ -81,22 +102,83 @@ module Sql =
     let connect constr  = { defaultProps() with ConnectionString = constr }
     let withCert cert props = { props with ClientCertificate = Some cert }
     let host x = { defaultConString() with Host = x }
-    let username x con = { con with Username = x }
-    let password x con = { con with Password = x }
+    let username username config = { config with Username = Some username }
+    /// Specifies the password of the user that is logging in into the database server
+    let password password config = { config with Password = Some password }
+    /// Specifies the database name
     let database x con = { con with Database = x }
-    let port n con = { con with Port = n }
-    let config x con = { con with Config = x }
-    let str (con:ConnectionStringBuilder) =
-        sprintf "Host=%s;Username=%s;Password=%s;Database=%s;Port=%d;%s"
-            con.Host
-            con.Username
-            con.Password
-            con.Database
-            con.Port
-            con.Config
+    /// Specifies how to manage SSL Mode.
+    let sslMode mode config = { config with SslMode = Some mode }
+    /// Specifies the port of the database server. If you don't specify the port, the default port of `5432` is used.
+    let port port config = { config with Port = Some port }
+    let trustServerCertificate value config = { config with TrustServerCertificate = Some value }
+    let convertInfinityDateTime value config = { config with ConvertInfinityDateTime = Some value }
+    let config extraConfig config = { config with Config = Some extraConfig }
+    let str (config:ConnectionStringBuilder) =
+        [
+            Some (sprintf "Host=%s" config.Host)
+            Some (sprintf "Database=%s" config.Database)
+            config.Username |> Option.map (sprintf "Username=%s")
+            config.Password |> Option.map (sprintf "Password=%s")
+            config.SslMode |> Option.map (fun mode -> sprintf "SslMode=%s" (mode.Serialize()))
+            config.TrustServerCertificate |> Option.map (sprintf "Trust Server Certificate=%b")
+            config.ConvertInfinityDateTime |> Option.map (sprintf "Convert Infinity DateTime=%b")
+            config.Port |> Option.map (sprintf "Port=%d")
+            config.Config
+        ]
+        |> List.choose id
+        |> String.concat ";"
 
+    let connectFromConfig (connectionConfig: ConnectionStringBuilder) =
+        connect (str connectionConfig)
     /// Turns the given postgres Uri into a proper connection string
-    let fromUri (uri: Uri) = uri.ToPostgresConnectionString();
+    let fromUri (uri: Uri) = uri.ToPostgresConnectionString()
+    /// Creates initial database connection configration from a the Uri components.
+    /// It try to find `Host`, `Username`, `Password`, `Database` and `Port` from the input `Uri`.
+    let fromUriToConfig (uri: Uri) =
+        let extractHost (uri: Uri) =
+            if String.IsNullOrWhiteSpace uri.Host
+            then Some ("Host", "localhost")
+            else Some ("Host", uri.Host)
+
+        let extractUser (uri: Uri) =
+            if uri.UserInfo.Contains ":" then
+                match uri.UserInfo.Split ':' with
+                | [| username; password|] ->
+                  [ ("Username", username); ("Password", password) ]
+                | otherwise -> [ ]
+            elif not (String.IsNullOrWhiteSpace uri.UserInfo) then
+                ["Username", uri.UserInfo ]
+            else
+                [ ]
+
+        let extractDatabase (uri: Uri) =
+            match uri.LocalPath.Split '/' with
+            | [| ""; databaseName |] -> Some ("Database", databaseName)
+            | otherwise -> None
+
+        let extractPort (uri: Uri) =
+            match uri.Port with
+            | -1 -> Some ("Port", "5432")
+            | n -> Some ("Port", string n)
+
+        let uriParts =
+            [ extractHost uri; extractDatabase uri; extractPort uri ]
+            |> List.choose id
+            |> List.append (extractUser uri)
+
+        let updateConfig config (partName, value) =
+            match partName with
+            | "Host" -> { config with Host = value }
+            | "Username" -> { config with Username = Some value }
+            | "Password" -> { config with Password = Some value }
+            | "Database" -> { config with Database = value }
+            | "Port" -> { config with Port = Some (int value) }
+            | otherwise -> config
+
+        (defaultConString(), uriParts)
+        ||> List.fold updateConfig
+
     let query (sql: string) props = { props with SqlQuery = [sql] }
     let func (sql: string) props = { props with SqlQuery = [sql]; IsFunction = true }
     let prepare  props = { props with NeedPrepare = true}
@@ -150,7 +232,7 @@ module Sql =
         |> Option.map snd
         |> function
             | Some (SqlValue.Time value) -> Some value
-            | _ -> None             
+            | _ -> None
 
     let readBool name (row: SqlRow) =
         row
@@ -222,7 +304,7 @@ module Sql =
 
     let toTime = function
         | SqlValue.Time x -> x
-        | value -> failwithf "Could not convert %A into a TimeSpan" value        
+        | value -> failwithf "Could not convert %A into a TimeSpan" value
 
     let toFloat = function
         | SqlValue.Number x -> x
@@ -288,13 +370,13 @@ module Sql =
         | :? int16 as x -> SqlValue.Short x
         | :? int32 as x -> SqlValue.Int x
         | :? string as x -> SqlValue.String x
-        | :? System.DateTimeOffset as x -> SqlValue.TimeWithTimeZone x
-        | :? System.DateTime as x -> SqlValue.Date x
+        | :? DateTimeOffset as x -> SqlValue.TimeWithTimeZone x
+        | :? DateTime as x -> SqlValue.Date x
         | :? bool as x ->  SqlValue.Bool x
         | :? int64 as x ->  SqlValue.Long x
         | :? decimal as x -> SqlValue.Decimal x
         | :? double as x ->  SqlValue.Number x
-        | :? System.Guid as x -> SqlValue.Uuid x
+        | :? Guid as x -> SqlValue.Uuid x
         | :? array<byte> as xs -> SqlValue.Bytea xs
         | :? IDictionary<string, string> as dict ->
             dict
