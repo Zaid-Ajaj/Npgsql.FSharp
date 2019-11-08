@@ -274,6 +274,23 @@ module Sql =
             | Some (SqlValue.Bytea value) -> Some value
             | _ -> None
 
+    /// Alias for Sql.readTimeWithTimeZone
+    let readDateTimeOffset name (row: SqlRow) =
+        row
+        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> Option.map snd
+        |> function
+            | Some (SqlValue.TimeWithTimeZone value) -> Some value
+            | _ -> None
+
+    let readTimeWithTimeZone name (row: SqlRow) =
+        row
+        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> Option.map snd
+        |> function
+            | Some (SqlValue.TimeWithTimeZone value) -> Some value
+            | _ -> None
+
     let readHStore name (row: SqlRow) =
         row
         |> List.tryFind (fun (colName, value) -> colName = name)
