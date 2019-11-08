@@ -61,7 +61,7 @@ let herokuConfig : string =
     Sql.fromUriToConfig (Uri "postgresql://user:password@localhost:5432/app_db")
     |> Sql.sslMode SslMode.Require
     |> Sql.trustServerCertificate true
-    |> Sql.string
+    |> Sql.str
 ```
 ### Sql.connect vs Sql.connectFromConfig
 
@@ -101,7 +101,7 @@ Notice we are not using `let bang` but just `let` instead
 ```fs
 let getAllUsers() : User list =
     defaultConnection
-    |> Sql.connect
+    |> Sql.connectFromConfig
     |> Sql.query "SELECT * FROM users"
     |> Sql.executeTable
     |> Sql.mapEachRow (fun row ->
@@ -120,7 +120,7 @@ let getAllUsers() : User list =
 ```fsharp
 let getAllUsers() : User list =
     defaultConnection
-    |> Sql.connect
+    |> Sql.connectFromConfig
     |> Sql.query "SELECT * FROM \"users\""
     |> Sql.executeReader (fun reader ->
         let row = Sql.readRow reader
@@ -140,7 +140,7 @@ let getAllUsers() : User list =
 /// Check whether or not a user exists by his username
 let userExists (name: string) : bool =
     defaultConnection
-    |> Sql.connect
+    |> Sql.connectFromConfig
     |> Sql.func "user_exists"
     |> Sql.parameters ["username", SqlValue.String name]
     |> Sql.executeScalar // SqlValue
@@ -170,7 +170,7 @@ connectionString
 /// Check whether or not a user exists by his username
 let userExists (name: string) : Async<bool> =
     defaultConnection
-    |> Sql.connect
+    |> Sql.connectFromConfig
     |> Sql.func "user_exists"
     |> Sql.parameters ["username", Sql.Value name]
     |> Sql.executeScalarAsync
@@ -188,7 +188,7 @@ let bookAttributes =
     |> Map.add "weight" "500g"
 
 defaultConnection
-|> Sql.connect
+|> Sql.connectFromConfig
 |> Sql.query "INSERT INTO \"books\" (id,title,attrs) VALUES (@bookId,@title,@attributes)"
 |> Sql.parameters
     [ "bookId", Sql.Value 20
@@ -202,7 +202,7 @@ defaultConnection
 // ping the database
 let serverTime() : Option<DateTime> =
     defaultConnection
-    |> Sql.connect
+    |> Sql.connectFromConfig
     |> Sql.query "SELECT NOW()"
     |> Sql.executeScalarSafe
     |> function
@@ -216,7 +216,7 @@ let serverTime() : Async<Option<DateTime>> =
     async {
         let! result =
           defaultConnection
-          |> Sql.connect
+          |> Sql.connectFromConfig
           |> Sql.query "SELECT NOW()"
           |> Sql.executeScalarSafeAsync
 
@@ -228,10 +228,10 @@ let serverTime() : Async<Option<DateTime>> =
 ### Batch queries in a single roundtrip to the database
 ```fs
 defaultConnection
-|> Sql.connect
+|> Sql.connectFromConfig
 |> Sql.queryMany
-    ["SELECT * FROM \"users\""
-     "SELECT * FROM \"products\""]
+    ["SELECT * FROM users"
+     "SELECT * FROM products"]
 |> Sql.executeMany // returns list<SqlTable>
 |> function
     | [ firstTable; secondTable ] -> (* do stuff *)
@@ -275,7 +275,7 @@ type User = {
 
 let getAllUsers() : User list =
     defaultConnection
-    |> Sql.connect
+    |> Sql.connectFromConfig
     |> Sql.query "SELECT * FROM \"users\""
     |> Sql.executeTable // SqlTable
     |> Sql.parseEachRow<User>
