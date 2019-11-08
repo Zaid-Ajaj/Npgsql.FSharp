@@ -701,7 +701,7 @@ module Sql =
                 |> Async.AwaitTask
         }
 
-    let executeReaderSafeTaskCt (cancellationToken : CancellationToken) (props: SqlProps) (read: NpgsqlDataReader -> Option<'t>) : Task<Result<'t list, exn>> =
+    let executeReaderSafeTaskCt (cancellationToken : CancellationToken) (read: NpgsqlDataReader -> Option<'t>) (props: SqlProps) : Task<Result<'t list, exn>> =
         task {
             try
                 if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
@@ -727,7 +727,7 @@ module Sql =
     let executeReaderSafeTask read props =
         executeReaderSafeTaskCt CancellationToken.None props read
 
-    let executeReaderSafeAsync read props =
+    let executeReaderSafeAsync props read  =
         async {
             let! token = Async.CancellationToken
             let! readerResult = Async.AwaitTask (executeReaderSafeTaskCt token read props)

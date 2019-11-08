@@ -7,12 +7,12 @@
     <PackageIconUrl></PackageIconUrl>
     <PackageTags>fsharp;postgres;sql;ngpsql</PackageTags>
     <Authors>Zaid Ajaj</Authors>
-    <Version>1.14.0</Version>
+    <Version>1.14.1</Version>
     <TargetFrameworks>netstandard2.0;net461;netcoreapp3.0</TargetFrameworks>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <LangVersion>latest</LangVersion>
     <PackageReleaseNotes>
-      Fix Sql.readRow when it is reading timestampz as datetime
+      Fix Sql.executeReader(SafeAsync|TastCt) where the props is required before the read function and flip the order of the functions
     </PackageReleaseNotes>
   </PropertyGroup>
 
