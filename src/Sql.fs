@@ -410,13 +410,15 @@ module Sql =
             | None -> failwithf "Unable to read column of type '%s'" typeName
 
     /// Reads a single row from the data reader synchronously
-    let readRow (reader : NpgsqlDataReader) : SqlRow =
+    let readRow (reader : Npgsql.NpgsqlDataReader) : SqlRow =
         let readFieldSync fieldIndex =
             let fieldName = reader.GetName(fieldIndex)
+            let typeName = reader.GetDataTypeName(fieldIndex)
             if reader.IsDBNull(fieldIndex)
             then fieldName, SqlValue.Null
+            elif typeName = "timestamptz"
+            then fieldName, SqlValue.TimeWithTimeZone(reader.GetFieldValue<DateTimeOffset>(fieldIndex))
             else fieldName, readValue (Some fieldName) (reader.GetFieldValue(fieldIndex))
-
         [0 .. reader.FieldCount - 1]
         |> List.map readFieldSync
 
