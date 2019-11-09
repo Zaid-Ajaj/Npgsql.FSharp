@@ -7,15 +7,15 @@
     <PackageIconUrl></PackageIconUrl>
     <PackageTags>fsharp;postgres;sql;ngpsql</PackageTags>
     <Authors>Zaid Ajaj</Authors>
-    <Version>1.14.1</Version>
+    <Version>1.15.0</Version>
     <TargetFrameworks>netstandard2.0;net461;netcoreapp3.0</TargetFrameworks>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <LangVersion>latest</LangVersion>
     <PackageReleaseNotes>
-      Fix Sql.executeReader(SafeAsync|TastCt) where the props is required before the read function and flip the order of the functions
+      Added documentation for various Sql.read{Type} functions to specify their behavior explicitly.
+      Update Npgsql dependency to 4.x
     </PackageReleaseNotes>
   </PropertyGroup>
-
   <ItemGroup>
     <Compile Include="OptionWorkflow.fs" />
     <Compile Include="Types.fs" />

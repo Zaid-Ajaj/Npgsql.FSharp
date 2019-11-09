@@ -117,13 +117,13 @@ module Sql =
     let str (config:ConnectionStringBuilder) =
         [
             Some (sprintf "Host=%s" config.Host)
+            config.Port |> Option.map (sprintf "Port=%d")
             Some (sprintf "Database=%s" config.Database)
             config.Username |> Option.map (sprintf "Username=%s")
             config.Password |> Option.map (sprintf "Password=%s")
             config.SslMode |> Option.map (fun mode -> sprintf "SslMode=%s" (mode.Serialize()))
             config.TrustServerCertificate |> Option.map (sprintf "Trust Server Certificate=%b")
             config.ConvertInfinityDateTime |> Option.map (sprintf "Convert Infinity DateTime=%b")
-            config.Port |> Option.map (sprintf "Port=%d")
             config.Config
         ]
         |> List.choose id
@@ -194,106 +194,145 @@ module Sql =
         | None -> ()
         connection
 
-    let readInt name (row: SqlRow) =
+    /// Tries to read the column value as an `int` from a row based on the provided name of the column.
+    /// Returns `Some value` when the column exists, when it has the type of integer and when it is not null.
+    /// Returns `None` otherwise.
+    let readInt (columnName: string) (row: SqlRow) =
         row
-        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> List.tryFind (fun (colName, value) -> colName = columnName)
         |> Option.map snd
         |> function
             | Some (SqlValue.Int value) -> Some value
             | _ -> None
 
-    let readLong name (row: SqlRow)  =
+    /// Tries to read the column value as an `int64` from a row based on the provided name of the column.
+    /// Returns `Some value` when the column exists, when it has the type of `int64` and when it is not null.
+    /// Returns `None` otherwise.
+    let readLong (columnName: string) (row: SqlRow)  =
         row
-        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> List.tryFind (fun (colName, value) -> colName = columnName)
         |> Option.map snd
         |> function
             | Some (SqlValue.Long value) -> Some value
             | _ -> None
 
-    let readString name (row: SqlRow) =
+    /// Tries to read the column value as an `string` from a row based on the provided name of the column.
+    /// Returns `Some value` when the column exists, when it has the type of `string` and when it is not null.
+    /// Returns `None` otherwise.
+    let readString (columnName: string) (row: SqlRow) =
         row
-        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> List.tryFind (fun (colName, value) -> colName = columnName)
         |> Option.map snd
         |> function
             | Some (SqlValue.String value) -> Some value
             | _ -> None
 
-    let readDate name (row: SqlRow) =
+    /// Tries to read the column value as a `DateTime` from a row based on the provided name of the column.
+    /// Returns `Some value` when the column exists, when it has the type of `DateTime` and when it is not null.
+    /// Returns `None` otherwise.
+    let readDate (columnName: string) (row: SqlRow) =
         row
-        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> List.tryFind (fun (colName, value) -> colName = columnName)
         |> Option.map snd
         |> function
             | Some (SqlValue.Date value) -> Some value
             | _ -> None
 
-    let readTime name (row: SqlRow) =
+    /// Tries to read the column value as a `TimeSpan` from a row based on the provided name of the column.
+    /// Returns `Some value` when the column exists, when it has the type of `TimeSpan` and when it is not null.
+    /// Returns `None` otherwise.
+    let readTime (columnName: string) (row: SqlRow) =
         row
-        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> List.tryFind (fun (colName, value) -> colName = columnName)
         |> Option.map snd
         |> function
             | Some (SqlValue.Time value) -> Some value
             | _ -> None
 
-    let readBool name (row: SqlRow) =
+    /// Tries to read the column value as a `bool` from a row based on the provided name of the column.
+    /// Returns `Some value` when the column exists, when it has the type of `bool` and when it is not null.
+    /// Returns `None` otherwise.
+    let readBool (columnName: string) (row: SqlRow) =
         row
-        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> List.tryFind (fun (colName, value) -> colName = columnName)
         |> Option.map snd
         |> function
             | Some (SqlValue.Bool value) -> Some value
             | _ -> None
 
-    let readDecimal name (row: SqlRow) =
+    /// Tries to read the column value as a `decimal` from a row based on the provided name of the column.
+    /// Returns `Some value` when the column exists, when it has the type of `decimal` and when it is not null.
+    /// Returns `None` otherwise.
+    let readDecimal (columnName: string) (row: SqlRow) =
         row
-        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> List.tryFind (fun (colName, value) -> colName = columnName)
         |> Option.map snd
         |> function
             | Some (SqlValue.Decimal value) -> Some value
             | _ -> None
 
-    let readNumber name (row: SqlRow) =
+    /// Tries to read the column value as a `double` from a row based on the provided name of the column.
+    /// Returns `Some value` when the column exists, when it has the type of `double` and when it is not null.
+    /// Returns `None` otherwise.
+    let readNumber (columnName: string) (row: SqlRow) =
         row
-        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> List.tryFind (fun (colName, value) -> colName = columnName)
         |> Option.map snd
         |> function
             | Some (SqlValue.Number value) -> Some value
             | _ -> None
 
-    let readUuid name (row: SqlRow) =
+    /// Tries to read the column value as a `Guid` from a row based on the provided name of the column.
+    /// Returns `Some value` when the column exists, when it has the type of `Guid` (type `Uuid` in Postgres) and when it is not null.
+    /// Returns `None` otherwise.
+    let readUuid (columnName: string) (row: SqlRow) =
         row
-        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> List.tryFind (fun (colName, value) -> colName = columnName)
         |> Option.map snd
         |> function
             | Some (SqlValue.Uuid value) -> Some value
             | _ -> None
 
-    let readBytea name (row: SqlRow) =
+    /// Tries to read the column value as a `byte array` from a row based on the provided name of the column.
+    /// Returns `Some value` when the column exists, when it has the type of `byte array` or `bytea` in Postgres and when it is not null.
+    /// Returns `None` otherwise.
+    let readBytea (columnName: string) (row: SqlRow) =
         row
-        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> List.tryFind (fun (colName, value) -> colName = columnName)
         |> Option.map snd
         |> function
             | Some (SqlValue.Bytea value) -> Some value
             | _ -> None
 
-    /// Alias for Sql.readTimeWithTimeZone
-    let readDateTimeOffset name (row: SqlRow) =
+    /// Tries to read the column value as a `DateTimeOffset` from a row based on the provided name of the column.
+    /// Returns `Some value` when the column exists, when it has the type of `DateTimeOffset` or `(timestamp|time) with timezone` in Postgres and when it is not null.
+    /// Returns `None` otherwise.
+    /// Alias for `Sql.readTimeWithTimeZone`
+    let readDateTimeOffset (columnName: string) (row: SqlRow) =
         row
-        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> List.tryFind (fun (colName, value) -> colName = columnName)
         |> Option.map snd
         |> function
             | Some (SqlValue.TimeWithTimeZone value) -> Some value
             | _ -> None
 
-    let readTimeWithTimeZone name (row: SqlRow) =
+    /// Tries to read the column value as a `DateTimeOffset` from a row based on the provided name of the column.
+    /// Returns `Some value` when the column exists, when it has the type of `DateTimeOffset` or `(timestamp|time) with timezone` in Postgres and when it is not null.
+    /// Returns `None` otherwise.
+    let readTimeWithTimeZone (columnName: string) (row: SqlRow) =
         row
-        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> List.tryFind (fun (colName, value) -> colName = columnName)
         |> Option.map snd
         |> function
             | Some (SqlValue.TimeWithTimeZone value) -> Some value
             | _ -> None
 
-    let readHStore name (row: SqlRow) =
+    /// Tries to read the column value as a `Map<string, string>` from a row based on the provided name of the column.
+    /// Returns `Some value` when the column exists, when it has the type of `HStore` which is a key-value dictionary in Postgres.
+    /// Returns `None` otherwise.
+    let readHStore (columnName: string) (row: SqlRow) =
         row
-        |> List.tryFind (fun (colName, value) -> colName = name)
+        |> List.tryFind (fun (colName, value) -> colName = columnName)
         |> Option.map snd
         |> function
             | Some (SqlValue.HStore value) -> Some value

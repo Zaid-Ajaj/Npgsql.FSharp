@@ -83,6 +83,11 @@ let handleInfinityConnection() =
     |> Sql.database "postgres"
     |> Sql.convertInfinityDateTime true
     |> Sql.str
+    |> fun x ->
+        printfn "%s" x
+        x
+
+
 
 execute "simple select and Sql.executeTable" <| fun _ ->
     defaultConnection()
