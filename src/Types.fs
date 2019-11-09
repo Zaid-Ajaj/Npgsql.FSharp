@@ -16,9 +16,11 @@ type SqlValue =
     | Bytea of byte[]
     | HStore of Map<string, string>
     | Uuid of Guid
+    | Timestamp of DateTime
+    | TimestampWithTimeZone of DateTime
+    | Time of TimeSpan
     | TimeWithTimeZone of DateTimeOffset
     | Jsonb of string
-    | Time of TimeSpan
 
 type SqlRow = list<string * SqlValue>
 

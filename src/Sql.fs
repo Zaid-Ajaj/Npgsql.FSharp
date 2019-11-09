@@ -271,6 +271,17 @@ module Sql =
             | Some (SqlValue.Decimal value) -> Some value
             | _ -> None
 
+    /// Tries to read the column value as a `decimal` from a row based on the provided name of the column.
+    /// Returns `Some value` when the column exists, when it has the type of `decimal` or `money` and when it is not null.
+    /// Returns `None` otherwise.
+    let readMoney (columnName: string) (row: SqlRow) =
+        row
+        |> List.tryFind (fun (colName, value) -> colName = columnName)
+        |> Option.map snd
+        |> function
+            | Some (SqlValue.Decimal value) -> Some value
+            | _ -> None
+
     /// Tries to read the column value as a `double` from a row based on the provided name of the column.
     /// Returns `Some value` when the column exists, when it has the type of `double` and when it is not null.
     /// Returns `None` otherwise.
@@ -304,20 +315,32 @@ module Sql =
             | Some (SqlValue.Bytea value) -> Some value
             | _ -> None
 
-    /// Tries to read the column value as a `DateTimeOffset` from a row based on the provided name of the column.
-    /// Returns `Some value` when the column exists, when it has the type of `DateTimeOffset` or `(timestamp|time) with timezone` in Postgres and when it is not null.
+    /// Tries to read the column value as a `DateTime` from a row based on the provided name of the column.
+    /// Returns `Some value` when the column exists, when it has the type of `timestamp` or `timestamp without time zone` and when it is not null.
     /// Returns `None` otherwise.
     /// Alias for `Sql.readTimeWithTimeZone`
-    let readDateTimeOffset (columnName: string) (row: SqlRow) =
+    let readTimestamp (columnName: string) (row: SqlRow) =
         row
         |> List.tryFind (fun (colName, value) -> colName = columnName)
         |> Option.map snd
         |> function
-            | Some (SqlValue.TimeWithTimeZone value) -> Some value
+            | Some (SqlValue.Timestamp value) -> Some value
+            | _ -> None
+
+    /// Tries to read the column value as a `DateTime` from a row based on the provided name of the column.
+    /// Returns `Some value` when the column exists, when it has the type of `timestamptz` or `timestamp with time zone` and when it is not null.
+    /// Returns `None` otherwise.
+    /// Alias for `Sql.readTimeWithTimeZone`
+    let readTimestampTz (columnName: string) (row: SqlRow) =
+        row
+        |> List.tryFind (fun (colName, value) -> colName = columnName)
+        |> Option.map snd
+        |> function
+            | Some (SqlValue.Timestamp value) -> Some value
             | _ -> None
 
     /// Tries to read the column value as a `DateTimeOffset` from a row based on the provided name of the column.
-    /// Returns `Some value` when the column exists, when it has the type of `DateTimeOffset` or `(timestamp|time) with timezone` in Postgres and when it is not null.
+    /// Returns `Some value` when the column exists, when it has the type of `DateTimeOffset` or `time with timezone` in Postgres and when it is not null.
     /// Returns `None` otherwise.
     let readTimeWithTimeZone (columnName: string) (row: SqlRow) =
         row
@@ -356,6 +379,8 @@ module Sql =
 
     let toDateTime = function
         | SqlValue.Date x -> x
+        | SqlValue.Timestamp x -> x
+        | SqlValue.TimestampWithTimeZone x -> x
         | value -> failwithf "Could not convert %A into a DateTime" value
 
     let toTime = function
@@ -426,8 +451,7 @@ module Sql =
         | :? int16 as x -> SqlValue.Short x
         | :? int32 as x -> SqlValue.Int x
         | :? string as x -> SqlValue.String x
-        | :? DateTimeOffset as x -> SqlValue.TimeWithTimeZone x
-        | :? DateTime as x -> SqlValue.Date x
+        | :? DateTime as x -> SqlValue.Timestamp x
         | :? bool as x ->  SqlValue.Bool x
         | :? int64 as x ->  SqlValue.Long x
         | :? decimal as x -> SqlValue.Decimal x
@@ -455,8 +479,16 @@ module Sql =
             let typeName = reader.GetDataTypeName(fieldIndex)
             if reader.IsDBNull(fieldIndex)
             then fieldName, SqlValue.Null
-            elif typeName = "timestamptz"
+            elif (typeName = "timestamptz" || typeName = "timestamp with time zone")
+            then fieldName, SqlValue.TimestampWithTimeZone(reader.GetFieldValue<DateTime>(fieldIndex))
+            elif (typeName = "timestamp" || typeName = "timestamp without time zone")
+            then fieldName, SqlValue.Timestamp(reader.GetFieldValue<DateTime>(fieldIndex))
+            elif (typeName = "time" || typeName = "time without time zone")
+            then fieldName, SqlValue.Time(reader.GetFieldValue<TimeSpan>(fieldIndex))
+            elif (typeName = "timetz" || typeName = "time with time zone")
             then fieldName, SqlValue.TimeWithTimeZone(reader.GetFieldValue<DateTimeOffset>(fieldIndex))
+            elif typeName = "date"
+            then fieldName, SqlValue.Date(reader.GetFieldValue<DateTime>(fieldIndex))
             else fieldName, readValue (Some fieldName) (reader.GetFieldValue(fieldIndex))
         [0 .. reader.FieldCount - 1]
         |> List.map readFieldSync
@@ -529,6 +561,8 @@ module Sql =
             | SqlValue.Uuid x -> upcast x, None
             | SqlValue.Short x -> upcast x, None
             | SqlValue.Date date -> upcast date, None
+            | SqlValue.Timestamp x -> upcast x, None
+            | SqlValue.TimestampWithTimeZone x -> upcast x, None
             | SqlValue.Number n -> upcast n, None
             | SqlValue.Bool b -> upcast b, None
             | SqlValue.Decimal x -> upcast x, None
@@ -816,6 +850,8 @@ module Sql =
     | SqlValue.Null -> null
     | SqlValue.Jsonb s -> box s
     | SqlValue.Time t -> box t
+    | SqlValue.Timestamp value -> box value
+    | SqlValue.TimestampWithTimeZone value -> box value
 
     let private valueAsOptionalObject = function
     | SqlValue.Short value -> box (Some value)
@@ -833,6 +869,8 @@ module Sql =
     | SqlValue.Null -> box (None)
     | SqlValue.Jsonb value -> box (Some value)
     | SqlValue.Time value -> box (Some value)
+    | SqlValue.Timestamp value -> box (Some value)
+    | SqlValue.TimestampWithTimeZone value -> box (Some value)
 
     let multiline xs = String.concat Environment.NewLine xs
 
