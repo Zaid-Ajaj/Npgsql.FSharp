@@ -262,7 +262,7 @@ module Sql =
 
     /// Tries to read the column value as a `decimal` from a row based on the provided name of the column.
     /// Returns `Some value` when the column exists, when it has the type of `decimal` and when it is not null.
-    /// Returns `None` otherwise.
+    /// Returns `None` otherwise. Similar to `Sql.readMoney`.
     let readDecimal (columnName: string) (row: SqlRow) =
         row
         |> List.tryFind (fun (colName, value) -> colName = columnName)
@@ -330,16 +330,15 @@ module Sql =
     /// Tries to read the column value as a `DateTime` from a row based on the provided name of the column.
     /// Returns `Some value` when the column exists, when it has the type of `timestamptz` or `timestamp with time zone` and when it is not null.
     /// Returns `None` otherwise.
-    /// Alias for `Sql.readTimeWithTimeZone`
     let readTimestampTz (columnName: string) (row: SqlRow) =
         row
         |> List.tryFind (fun (colName, value) -> colName = columnName)
         |> Option.map snd
         |> function
-            | Some (SqlValue.Timestamp value) -> Some value
+            | Some (SqlValue.TimestampWithTimeZone value) -> Some value
             | _ -> None
 
-    /// Tries to read the column value as a `DateTimeOffset` from a row based on the provided name of the column.
+    /// Tries to read the column value as a `DateTimeOffset` where the *date* component is dropped off from a row based on the provided name of the column.
     /// Returns `Some value` when the column exists, when it has the type of `DateTimeOffset` or `time with timezone` in Postgres and when it is not null.
     /// Returns `None` otherwise.
     let readTimeWithTimeZone (columnName: string) (row: SqlRow) =
@@ -371,10 +370,13 @@ module Sql =
 
     let toLong = function
         | SqlValue.Long x -> x
+        | SqlValue.Int x -> int64 x
         | value -> failwithf "Could not convert %A into a long" value
 
     let toString = function
         | SqlValue.String x -> x
+        | SqlValue.Int x -> string x
+        | SqlValue.Long x -> string x
         | value -> failwithf "Could not convert %A into a string" value
 
     let toDateTime = function
