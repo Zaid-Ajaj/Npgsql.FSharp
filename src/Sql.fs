@@ -799,10 +799,10 @@ module Sql =
             | ex -> return Error ex
         }
 
-    let executeReaderSafeTask read props =
-        executeReaderSafeTaskCt CancellationToken.None props read
+    let executeReaderSafeTask read (props: SqlProps)  =
+        executeReaderSafeTaskCt CancellationToken.None read props
 
-    let executeReaderSafeAsync props read  =
+    let executeReaderSafeAsync read (props: SqlProps)   =
         async {
             let! token = Async.CancellationToken
             let! readerResult = Async.AwaitTask (executeReaderSafeTaskCt token read props)
