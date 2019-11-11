@@ -144,6 +144,31 @@ execute "Reading time" <| fun _ ->
     |> Sql.toDateTime
     |> printfn "%A"
 
+execute "Reading time with reader" <| fun _ ->
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "SELECT NOW()::timestamp AS time"
+    |> Sql.executeReader (Sql.readRow >> Sql.readTimestamp "time")
+    |> printfn "%A"
+
+execute "Reading time with reader async" <| fun _ ->
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "SELECT NOW()::timestamp AS time"
+    |> Sql.executeReaderAsync (Sql.readRow >> Sql.readTimestamp "time")
+    |> Async.RunSynchronously
+    |> printfn "%A"
+
+execute "Reading time with reader safe async" <| fun _ ->
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "SELECT NOW()::timestamp AS time"
+    |> Sql.executeReaderSafeAsync (Sql.readRow >> Sql.readTimestamp "time")
+    |> Async.RunSynchronously
+    |> function
+        | Ok date -> printfn "%A" date
+        | Error error ->  printfn "%A" error
+
 execute "Sql.qeuryMany and Sql.executeMany" <| fun _ ->
     let store = "SELECT * FROM fsharp_tests"
 

@@ -760,7 +760,7 @@ module Sql =
             while !canRead do
                 let! readMore = reader.ReadAsync cancellationToken
                 canRead := readMore
-                result.Add (read postgresReader)
+                if !canRead then result.Add (read postgresReader)
 
             return List.choose id (List.ofSeq result)
         }
@@ -792,7 +792,7 @@ module Sql =
                 while !canRead do
                     let! readMore = reader.ReadAsync cancellationToken
                     canRead := readMore
-                    result.Add (read postgresReader)
+                    if !canRead then result.Add (read postgresReader)
 
                 return Ok (List.choose id (List.ofSeq result))
             with

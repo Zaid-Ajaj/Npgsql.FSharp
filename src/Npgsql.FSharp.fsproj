@@ -7,13 +7,12 @@
     <PackageIconUrl></PackageIconUrl>
     <PackageTags>fsharp;postgres;sql;ngpsql</PackageTags>
     <Authors>Zaid Ajaj</Authors>
-    <Version>1.17.0</Version>
+    <Version>1.17.1</Version>
     <TargetFrameworks>netstandard2.0;net461;netcoreapp3.0</TargetFrameworks>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <LangVersion>latest</LangVersion>
     <PackageReleaseNotes>
-      Fix the parameter order of Sql.executeReaderSafeAsync
-      Fix the parameter order of Sql.executeReaderSafeTask
+      Fix the actual reading of Sql.executeReaderAsync and Sql.executeReaderSafeAsync with tests
     </PackageReleaseNotes>
   </PropertyGroup>
   <ItemGroup>
