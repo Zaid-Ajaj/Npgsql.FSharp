@@ -20,9 +20,11 @@ type SqlValue =
     | Bytea of byte[]
     | HStore of Map<string, string>
     | Uuid of Guid
+    | Timestamp of DateTime
+    | TimestampWithTimeZone of DateTime
+    | Time of TimeSpan
     | TimeWithTimeZone of DateTimeOffset
     | Jsonb of string
-    | Time of TimeSpan
 
 // A row is a list of key/value pairs
 type SqlRow = list<string * SqlValue>
@@ -85,7 +87,7 @@ type User = {
 let getAllUsers() : User list =
     defaultConnection
     |> Sql.connectFromConfig
-    |> Sql.query "SELECT * FROM \"users\""
+    |> Sql.query "SELECT * FROM users"
     |> Sql.executeTable
     |> Sql.mapEachRow (fun row ->
         option {
@@ -121,7 +123,7 @@ let getAllUsers() : User list =
 let getAllUsers() : User list =
     defaultConnection
     |> Sql.connectFromConfig
-    |> Sql.query "SELECT * FROM \"users\""
+    |> Sql.query "SELECT * FROM users"
     |> Sql.executeReader (fun reader ->
         let row = Sql.readRow reader
         option {
@@ -142,7 +144,7 @@ let userExists (name: string) : bool =
     defaultConnection
     |> Sql.connectFromConfig
     |> Sql.func "user_exists"
-    |> Sql.parameters ["username", SqlValue.String name]
+    |> Sql.parameters ["username", Sql.Value name]
     |> Sql.executeScalar // SqlValue
     |> Sql.toBool
 ```
@@ -189,7 +191,7 @@ let bookAttributes =
 
 defaultConnection
 |> Sql.connectFromConfig
-|> Sql.query "INSERT INTO \"books\" (id,title,attrs) VALUES (@bookId,@title,@attributes)"
+|> Sql.query "INSERT INTO books (id,title,attrs) VALUES (@bookId, @title, @attributes)"
 |> Sql.parameters
     [ "bookId", Sql.Value 20
       "title", Sql.Value "Lord of the rings"
@@ -206,7 +208,7 @@ let serverTime() : Option<DateTime> =
     |> Sql.query "SELECT NOW()"
     |> Sql.executeScalarSafe
     |> function
-        | Ok (SqlValue.Date time) -> Some time
+        | Ok (SqlValue.Timestamp time) -> Some time
         | _ -> None
 ```
 ### Retrieve single value safely asynchronously
@@ -221,7 +223,7 @@ let serverTime() : Async<Option<DateTime>> =
           |> Sql.executeScalarSafeAsync
 
         match result with
-        | Ok (SqlValue.Date time) -> return Some time
+        | Ok (SqlValue.Timestamp time) -> return Some time
         | otherwise -> return None
     }
 ```
@@ -276,7 +278,7 @@ type User = {
 let getAllUsers() : User list =
     defaultConnection
     |> Sql.connectFromConfig
-    |> Sql.query "SELECT * FROM \"users\""
+    |> Sql.query "SELECT * FROM users"
     |> Sql.executeTable // SqlTable
     |> Sql.parseEachRow<User>
 ```
