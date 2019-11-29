@@ -16,6 +16,16 @@ type TimeSpanTest = {
     at: TimeSpan
 }
 
+type StringArrayTest = {
+    id: int
+    values:string array
+}
+
+type IntArrayTest = {
+    id: int
+    integers: int array
+}
+
 let execute name f =
     printfn ""
     printfn " ============= Start %s =========== " name
@@ -407,6 +417,113 @@ execute "Handle TimeSpan" <| fun _ ->
     defaultConnection()
     |> Sql.connect
     |> Sql.query "drop table if exists timespan_test"
+    |> Sql.executeNonQuery
+    |> ignore
+
+execute "Handle String Array" <| fun _ ->
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "create table if not exists string_array_test (id int, values text [])"
+    |> Sql.executeNonQuery
+    |> ignore
+
+    let getString () =
+        let temp = Guid.NewGuid()
+        temp.ToString("N")
+    let a = [| getString() |]
+    let b = [| getString(); getString() |]
+    let c : string array = [||]
+
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.executeTransaction [
+        "INSERT INTO string_array_test (id, values) values (@id, @values)", [
+            [ "@id", Sql.Value 1; "@values", Sql.Value a ]
+            [ "@id", Sql.Value 2; "@values", Sql.Value b ]
+            [ "@id", Sql.Value 3; "@values", Sql.Value c ]
+        ]
+    ]
+    |> ignore
+
+    // Use `parseEachRow<T>`
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "SELECT * FROM string_array_test"
+    |> Sql.executeTable
+    |> Sql.parseEachRow<StringArrayTest>
+    |> printfn "StringArray records with parseEachRow:\n %A"
+
+
+    // Use `mapEachRow` + `readStringArray`
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "SELECT * FROM string_array_test"
+    |> Sql.prepare
+    |> Sql.executeTable
+    |> Sql.mapEachRow (fun row ->
+        option {
+            let! id = Sql.readInt "id" row
+            let! values = Sql.readStringArray "values" row
+            return { id = id; values = values }
+        })
+    |> printfn "StringArray records with  `mapEachRow` + `readStringArray` :\n %A"
+
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "drop table if exists string_array_test"
+    |> Sql.executeNonQuery
+    |> ignore
+
+
+execute "Handle int Array" <| fun _ ->
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "create table if not exists int_array_test (id int, integers int [])"
+    |> Sql.executeNonQuery
+    |> ignore
+
+
+    let a = [| 1; 2 |]
+    let b = [| for i in 0..10 do yield i |]
+    let c : int array = [||]
+
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.executeTransaction [
+        "INSERT INTO int_array_test (id, integers) values (@id, @integers)", [
+            [ "@id", Sql.Value 1; "@integers", Sql.Value a ]
+            [ "@id", Sql.Value 2; "@integers", Sql.Value b ]
+            [ "@id", Sql.Value 3; "@integers", Sql.Value c ]
+        ]
+    ]
+    |> ignore
+
+    // Use `parseEachRow<T>`
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "SELECT * FROM int_array_test"
+    |> Sql.executeTable
+    |> Sql.parseEachRow<IntArrayTest>
+    |> printfn "StringArray records with parseEachRow:\n %A"
+
+
+    // Use `mapEachRow` + `readStringArray`
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "SELECT * FROM int_array_test"
+    |> Sql.prepare
+    |> Sql.executeTable
+    |> Sql.mapEachRow (fun row ->
+        option {
+            let! id = Sql.readInt "id" row
+            let! integers = Sql.readIntArray "integers" row
+            return { id = id; integers = integers }
+        })
+    |> printfn "StringArray records with  `mapEachRow` + `readStringArray` :\n %A"
+
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "drop table if exists int_array_test"
     |> Sql.executeNonQuery
     |> ignore
 
