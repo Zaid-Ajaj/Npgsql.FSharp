@@ -38,6 +38,8 @@ type Sql() =
     static member Value(bytea: byte[]) = SqlValue.Bytea bytea
     static member Value(map: Map<string, string>) = SqlValue.HStore map
     static member Value(value: TimeSpan) = SqlValue.Time value
+    static member Value(value : string array) =  SqlValue.StringArray value
+    static member Value(value : int array) =  SqlValue.IntArray value
 
 /// Specifies how to manage SSL.
 [<RequireQualifiedAccess>]
@@ -360,6 +362,22 @@ module Sql =
             | Some (SqlValue.HStore value) -> Some value
             | _ -> None
 
+    let readStringArray (columnName: string) (row: SqlRow) =
+        row
+        |> List.tryFind (fun (colName, value) -> colName = columnName)
+        |> Option.map snd
+        |> function
+            | Some (SqlValue.StringArray value) -> Some value
+            | _ -> None
+
+    let readIntArray (columnName: string) (row: SqlRow) =
+        row
+        |> List.tryFind (fun (colName, value) -> colName = columnName)
+        |> Option.map snd
+        |> function
+            | Some (SqlValue.IntArray value) -> Some value
+            | _ -> None
+
     let toBool = function
         | SqlValue.Bool x -> x
         | value -> failwithf "Could not convert %A into a boolean value" value
@@ -392,6 +410,10 @@ module Sql =
     let toFloat = function
         | SqlValue.Number x -> x
         | value -> failwithf "Could not convert %A into a floating number" value
+
+    let toStringArray = function
+        | SqlValue.StringArray x -> x
+        | value -> failwithf "Could not convert %A into a string array" value
 
     let (|NullInt|_|) = function
         | SqlValue.Null -> None
@@ -448,6 +470,16 @@ module Sql =
         | SqlValue.Number value -> Some value
         | _ -> None
 
+    let (|NullStringArray|_|) = function
+        | SqlValue.Null -> None
+        | SqlValue.StringArray value -> Some value
+        | _ -> None
+
+    let (|NullIntArray|_|) = function
+        | SqlValue.Null -> None
+        | SqlValue.IntArray value -> Some value
+        | _ -> None
+
     let readValue (columnName: Option<string>) value =
         match box value with
         | :? int16 as x -> SqlValue.Short x
@@ -468,6 +500,8 @@ module Sql =
         | null -> SqlValue.Null
         | :? System.DBNull -> SqlValue.Null
         | :? TimeSpan as x -> SqlValue.Time x
+        | :? array<string> as x -> SqlValue.StringArray x
+        | :? array<int> as x -> SqlValue.IntArray x
         | other ->
             let typeName = (other.GetType()).FullName
             match columnName with
@@ -581,6 +615,8 @@ module Sql =
                 upcast value, None
             | SqlValue.Jsonb x -> upcast x, Some NpgsqlTypes.NpgsqlDbType.Jsonb
             | SqlValue.Time x -> upcast x, None
+            | SqlValue.StringArray x -> upcast x, Some (NpgsqlTypes.NpgsqlDbType.Array ||| NpgsqlTypes.NpgsqlDbType.Text )
+            | SqlValue.IntArray x -> upcast x, Some (NpgsqlTypes.NpgsqlDbType.Array ||| NpgsqlTypes.NpgsqlDbType.Integer )
 
           let paramName =
             if not (paramName.StartsWith "@")
@@ -854,6 +890,8 @@ module Sql =
     | SqlValue.Time t -> box t
     | SqlValue.Timestamp value -> box value
     | SqlValue.TimestampWithTimeZone value -> box value
+    | SqlValue.StringArray value -> box value
+    | SqlValue.IntArray value -> box value
 
     let private valueAsOptionalObject = function
     | SqlValue.Short value -> box (Some value)
@@ -873,6 +911,8 @@ module Sql =
     | SqlValue.Time value -> box (Some value)
     | SqlValue.Timestamp value -> box (Some value)
     | SqlValue.TimestampWithTimeZone value -> box (Some value)
+    | SqlValue.StringArray value -> box (Some value)
+    | SqlValue.IntArray value -> box (Some value)
 
     let multiline xs = String.concat Environment.NewLine xs
 

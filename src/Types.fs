@@ -21,6 +21,8 @@ type SqlValue =
     | Time of TimeSpan
     | TimeWithTimeZone of DateTimeOffset
     | Jsonb of string
+    | StringArray of string array
+    | IntArray of int array
 
 type SqlRow = list<string * SqlValue>
 

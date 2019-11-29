@@ -7,7 +7,7 @@ open Fake
 let libPath = "./src"
 let testsPath = "./integration-tests"
 let databaseDockerContainerName = "npgsql_fsharp_db"
-let databaseDockerImageName = "npgsql_fsharp_image"
+let databaseDockerImageName = "postgres"
 let databasePassword = "postgres"
 
 
@@ -82,8 +82,6 @@ Target "StartDatabase" (fun _ ->
     |> processResult
     |> function
     | NeverRan ->
-        sprintf "build -t %s %s" databaseDockerImageName testsPath
-        |> runDocker
         sprintf "run --name %s -e POSTGRES_PASSWORD=%s -p 5432:5432 -d %s" databaseDockerContainerName databasePassword databaseDockerImageName
         |> runDocker
     | Stopped ->
