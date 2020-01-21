@@ -535,6 +535,23 @@ execute "Local UTC time" <| fun _ ->
     |> Sql.toTime
     |> printfn "%A"
 
+execute "String option roundtrip" <| fun _ ->
+    let a : string option = Some "abc"
+    let b : string option = None
+
+    defaultConnection()
+    |> Sql.connect
+    |> Sql.query "SELECT @a, @b"
+    |> Sql.parameters [ "a", Sql.Value a; "b", Sql.Value b ]
+    |> Sql.executeTable
+    |> function
+        | [ [ (_, SqlValue.String output); (_, SqlValue.Null) ] ] ->
+            if (a <> (Some output))
+            then failwith "String option roundtrip failed, the output was different"
+            else printfn "String option roundtrip worked"
+
+        | _ -> failwith "String option roundtrip failed"
+
 defaultConnection()
 |> Sql.connect
 |> Sql.query "DROP TABLE data"
