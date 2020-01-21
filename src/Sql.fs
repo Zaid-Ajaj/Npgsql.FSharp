@@ -40,6 +40,21 @@ type Sql() =
     static member Value(value: TimeSpan) = SqlValue.Time value
     static member Value(value : string array) =  SqlValue.StringArray value
     static member Value(value : int array) =  SqlValue.IntArray value
+    static member Value(value: int option) = match value with | Some value -> SqlValue.Int value | None -> SqlValue.Null
+    static member Value(value: string option) = match value with | Some value -> SqlValue.String value | None -> SqlValue.Null
+    static member Value(value: int16 option) = match value with | Some value -> SqlValue.Short value | None -> SqlValue.Null
+    static member Value(value: double option) = match value with | Some value -> SqlValue.Number value | None -> SqlValue.Null
+    static member Value(value: decimal option) = match value with | Some value -> SqlValue.Decimal value | None -> SqlValue.Null
+    static member Value(value: int64 option) = match value with | Some value -> SqlValue.Long value | None -> SqlValue.Null
+    static member Value(value: DateTime option) = match value with | Some value -> SqlValue.Date value | None -> SqlValue.Null
+    static member Value(value: bool option) = match value with | Some value -> SqlValue.Bool value | None -> SqlValue.Null
+    static member Value(value: DateTimeOffset option) = match value with | Some value -> SqlValue.TimeWithTimeZone value | None -> SqlValue.Null
+    static member Value(value: Guid option) = match value with | Some value -> SqlValue.Uuid value | None -> SqlValue.Null
+    static member Value(value: byte[] option) = match value with | Some value -> SqlValue.Bytea value | None -> SqlValue.Null
+    static member Value(map: Map<string, string> option) = match map with | Some map -> SqlValue.HStore map | None -> SqlValue.Null
+    static member Value(value: TimeSpan option) = match value with | Some value -> SqlValue.Time value | None -> SqlValue.Null
+    static member Value(value: string[] option) = match value with | Some value -> SqlValue.StringArray value | None -> SqlValue.Null
+    static member Value(value: int[] option) = match value with | Some value -> SqlValue.IntArray value | None -> SqlValue.Null
 
 /// Specifies how to manage SSL.
 [<RequireQualifiedAccess>]
