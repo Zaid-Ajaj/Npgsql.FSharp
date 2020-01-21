@@ -90,8 +90,8 @@ let getAllUsers() : User list =
     defaultConnection
     |> Sql.connectFromConfig
     |> Sql.query "SELECT * FROM users"
-    |> Sql.executeTable
-    |> Sql.mapEachRow (fun row ->
+    |> Sql.executeReader (fun reader ->
+        let row = Sql.readRow reader
         option {
             let! id = Sql.readInt "user_id" row
             let! fname = Sql.readString "first_name" row
@@ -107,8 +107,8 @@ let getAllUsers() : User list =
     defaultConnection
     |> Sql.connectFromConfig
     |> Sql.query "SELECT * FROM users"
-    |> Sql.executeTable
-    |> Sql.mapEachRow (fun row ->
+    |> Sql.executeReader (fun reader ->
+        let row = Sql.readRow reader
         option {
             let! id = Sql.readInt "user_id" row
             let fname = Sql.readString "first_name" row
@@ -120,13 +120,13 @@ let getAllUsers() : User list =
             }
         })
 ```
-### Use `Sql.executeReader` instead of creating intermediate table for lower memory footprint
+### Make the reading async using `Sql.executeReaderAsync`
 ```fsharp
 let getAllUsers() : User list =
     defaultConnection
     |> Sql.connectFromConfig
     |> Sql.query "SELECT * FROM users"
-    |> Sql.executeReader (fun reader ->
+    |> Sql.executeReaderAsync (fun reader ->
         let row = Sql.readRow reader
         option {
             let! id = Sql.readInt "user_id" row
@@ -299,7 +299,6 @@ type User = {
     Nickname : string option
 }
 ```
-
 
 ### To Run tests
 

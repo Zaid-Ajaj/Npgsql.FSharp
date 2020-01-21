@@ -631,6 +631,7 @@ module Sql =
         if props.IsFunction then cmd.CommandType <- CommandType.StoredProcedure
         populateRow cmd props.Parameters
 
+    [<Obsolete "Sql.executeTable will be removed in the next major release because it creates an intermediate list of parsed values. Use Sql.executeReader instead to lower the memory footprint.">]
     let executeTable (props: SqlProps) : SqlTable =
         if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
         use connection = newConnection props
@@ -641,10 +642,12 @@ module Sql =
         use reader = command.ExecuteReader()
         readTable reader
 
+    [<Obsolete "Sql.executeTableSafe will be removed in the next major release because it creates an intermediate list of parsed values. Use Sql.executeReader instead to lower the memory footprint.">]
     let executeTableSafe (props: SqlProps) : Result<SqlTable, exn> =
         try Ok (executeTable props)
         with | ex -> Error ex
 
+    [<Obsolete "Sql.executeTableTaskCt will be removed in the next major release because it creates an intermediate list of parsed values. Use Sql.executeReader instead to lower the memory footprint.">]
     let executeTableTaskCt (cancellationToken : CancellationToken) (props: SqlProps) =
         task {
             if List.isEmpty props.SqlQuery then failwith "No query provided to execute"
@@ -657,9 +660,11 @@ module Sql =
             return! readTableTaskCt cancellationToken (reader |> unbox<NpgsqlDataReader>)
         }
 
+    [<Obsolete "Sql.executeTableTask will be removed in the next major release because it creates an intermediate list of parsed values. Use Sql.executeReader instead to lower the memory footprint.">]
     let executeTableTask (props: SqlProps) =
         executeTableTaskCt CancellationToken.None
 
+    [<Obsolete "Sql.executeTableAsync will be removed in the next major release because it creates an intermediate list of parsed values. Use Sql.executeReader instead to lower the memory footprint.">]
     let executeTableAsync (props: SqlProps) : Async<SqlTable> =
         async {
             let! ct = Async.CancellationToken

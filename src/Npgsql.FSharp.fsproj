@@ -7,13 +7,13 @@
     <PackageIconUrl></PackageIconUrl>
     <PackageTags>fsharp;postgres;sql;ngpsql</PackageTags>
     <Authors>Zaid Ajaj</Authors>
-    <Version>1.18.0</Version>
+    <Version>1.19.0</Version>
     <TargetFrameworks>netstandard2.0;net461;netcoreapp3.0</TargetFrameworks>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <LangVersion>latest</LangVersion>
     <PackageReleaseNotes>
-      Add String Array
-      Add Int Array
+      Adds optional variants to Sql.Value by @njlr
+      Add deprecation notice for Sql.executeTable
     </PackageReleaseNotes>
   </PropertyGroup>
   <ItemGroup>
