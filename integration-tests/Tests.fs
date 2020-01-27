@@ -650,6 +650,18 @@ let tests =
                 let databaseNow = List.head databaseNowColl
                 Expect.isAscending [now; databaseNow; later] "Check database `now` function is accurate"
             } 
+
+            test "Jsonb roundtrip" {
+                let jsonData = "value from F#"
+                let inputJson = "{\"property\": \"" + jsonData + "\"}"
+                let jsonValue : SqlValue =
+                    connection
+                    |> Sql.connect
+                    |> Sql.query "select @jsonb"
+                    |> Sql.parameters ["jsonb", SqlValue.Jsonb inputJson]
+                    |> Sql.executeScalar
+                Expect.equal (SqlValue.String inputJson) jsonValue "Check json value returned from database is the same sent"
+            }
         ]
     ]
 
