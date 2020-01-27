@@ -1,5 +1,6 @@
 module Main
 
+open Expecto
 open Npgsql.FSharp
 open Npgsql.FSharp.OptionWorkflow
 open System
@@ -559,3 +560,13 @@ defaultConnection()
 |> printfn "Drop Table data returned %A"
 
 cleanupDefaultDatabase()
+
+let tests =
+
+    testList "Integration tests" [
+        
+    ]
+
+[<EntryPoint>]
+let main args =
+    runTestsWithArgs defaultConfig args tests
