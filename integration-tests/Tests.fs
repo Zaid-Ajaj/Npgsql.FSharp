@@ -613,7 +613,20 @@ let tests =
         let connection : string = defaultConnection()
         cleanDatabase connection
         buildDatabase connection
-        
+
+        testList "Query-only parallel tests without recreating database" [
+
+            test "Null roundtrip" {
+                let queryOutput : SqlValue =
+                    connection
+                    |> Sql.connect
+                    |> Sql.query "SELECT @nullValue"
+                    |> Sql.parameters [ "nullValue", SqlValue.Null ]
+                    |> Sql.executeScalar
+                Expect.equal SqlValue.Null queryOutput "Check null value returned from database is the same sent"
+            }
+            
+        ]
     ]
 
 [<EntryPoint>]
