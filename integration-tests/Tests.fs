@@ -725,6 +725,17 @@ let tests =
                 Expect.equal (SqlValue.Decimal 12.5M) dbMoney "Check money as decimal read from database is the same sent"        
             }
 
+            test "uuid_generate_v4()" {
+                let dbUuid : SqlValue =
+                    defaultConnection()
+                    |> Sql.connect
+                    |> Sql.query "SELECT uuid_generate_v4()"
+                    |> Sql.executeScalar
+                match dbUuid with
+                | SqlValue.Uuid uuid -> Expect.isNotNull (uuid.ToString()) "Check database generates an UUID"
+                | _ -> failwith "Invalid branch"
+            }
+
         ]
 
     ]
