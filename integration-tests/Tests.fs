@@ -638,6 +638,18 @@ let tests =
                 Expect.isAscending [now; databaseNow; later] "Check database `now` function is accurate"
             }
             
+            test "Reading time with reader" {
+                let now : DateTime = DateTime.UtcNow
+                let databaseNowColl : list<DateTime> =
+                    connection
+                    |> Sql.connect
+                    |> Sql.query "SELECT NOW()::timestamp AS time"
+                    |> Sql.executeReader (Sql.readRow >> Sql.readTimestamp "time")
+                let later : DateTime = now.AddMinutes(1.0)
+                Expect.equal 1 (List.length databaseNowColl) "Check list is a singleton"
+                let databaseNow = List.head databaseNowColl
+                Expect.isAscending [now; databaseNow; later] "Check database `now` function is accurate"
+            } 
         ]
     ]
 
