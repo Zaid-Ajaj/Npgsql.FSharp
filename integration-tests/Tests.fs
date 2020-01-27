@@ -561,6 +561,30 @@ defaultConnection()
 
 cleanupDefaultDatabase()
 
+let buildDatabase (connection: string) : unit =
+    let createFSharpTable = "create table fsharp_test (test_id int, test_name text)"
+    let createJsonbTable = "create table data_with_jsonb (data jsonb)"
+    let createTimestampzTable = "create table timestampz_test (version integer, date1 timestamptz, date2 timestamptz)"
+    let createTimespanTable = "create table if not exists timespan_test (id int, at time without time zone)"
+    let createStringArrayTable = "create table if not exists string_array_test (id int, values text [])"
+    let createIntArrayTable = "create table if not exists int_array_test (id int, integers int [])"
+    let createExtensionHStore = "create extension if not exists hstore"
+    let createExtensionUuid = "create extension if not exists \"uuid-ossp\""
+    connection
+    |> Sql.connect
+    |> Sql.queryMany [
+        createFSharpTable
+        createJsonbTable
+        createTimestampzTable
+        createTimespanTable
+        createStringArrayTable
+        createIntArrayTable
+        createExtensionHStore
+        createExtensionUuid
+    ]
+    |> Sql.executeMany
+    |> ignore
+
 let cleanDatabase (connection: string) : unit =
     let dropFSharpTable = "drop table if exists fsharp_test"
     let dropIntArrayTable = "drop table if exists int_array_test"
