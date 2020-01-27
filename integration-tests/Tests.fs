@@ -662,7 +662,22 @@ let tests =
                     |> Sql.executeScalar
                 Expect.equal (SqlValue.String inputJson) jsonValue "Check json value returned from database is the same sent"
             }
+
+            testAsync "Reading time with reader async" {
+                let now : DateTime = DateTime.UtcNow
+                let! databaseNowColl =
+                    connection
+                    |> Sql.connect
+                    |> Sql.query "SELECT NOW()::timestamp AS time"
+                    |> Sql.executeReaderAsync (Sql.readRow >> Sql.readTimestamp "time")
+                let later : DateTime = now.AddMinutes(1.0)
+                Expect.equal 1 (List.length databaseNowColl) "Check list is a singleton"
+                let databaseNow = List.head databaseNowColl
+                Expect.isAscending [now; databaseNow; later] "Check database `now` function is accurate"
+            }
+
         ]
+        
     ]
 
 [<EntryPoint>]
