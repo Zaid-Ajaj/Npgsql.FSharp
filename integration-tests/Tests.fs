@@ -764,6 +764,20 @@ let tests =
                 | _ -> failwith "Invalid branch"  
             }
 
+            // Unhandled Exception: System.NotSupportedException: Npgsql 3.x removed support 
+            // for writing a parameter with an IEnumerable value, use .ToList()/.ToArray() instead.
+            // Need to add a NpgsqlTypeHandler for Map ?
+            test "HStore roundtrip" {
+                let inputMap : Map<string, string> = Map ["property", "value from F#"]
+                let value = 
+                    connection
+                    |> Sql.connect
+                    |> Sql.query "select @map"
+                    |> Sql.parameters ["map", Sql.Value inputMap]
+                    |> Sql.executeScalar
+                Expect.equal (SqlValue.HStore inputMap) value "Check hstore value read from database is the same sent"                           
+            }
+
         ]
 
     ]
