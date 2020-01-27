@@ -609,6 +609,11 @@ let tests =
 
     testList "Integration tests" [
         
+        // Setup: Run once for all tests.
+        let connection : string = defaultConnection()
+        cleanDatabase connection
+        buildDatabase connection
+        
     ]
 
 [<EntryPoint>]
