@@ -886,6 +886,54 @@ let tests =
                     "Check all rows from `fsharp_test` table using a Reader"
             }
 
+            test "Sql.queryMany and Sql.executeMany" {
+                let seedDatabase (connection: string) =
+                    connection
+                    |> Sql.connect
+                    |> Sql.executeTransaction [
+                        "INSERT INTO fsharp_test (test_id, test_name) values (@id, @name)", [
+                            [ "@id", Sql.Value 1; "@name", Sql.Value "first test" ]
+                            [ "@id", Sql.Value 2; "@name", Sql.Value "second test" ]
+                            [ "@id", Sql.Value 3; "@name", Sql.Value "third test" ]
+                        ]
+                    ]
+                    |> ignore
+                cleanDatabase connection
+                buildDatabase connection
+                seedDatabase connection
+                let store : string = "SELECT * FROM fsharp_test"
+                let storeMetadata : string =
+                    Sql.multiline [
+                        "select column_name, data_type"
+                        "from information_schema.columns"
+                        "where table_name = 'fsharp_test'"
+                    ]
+                let tables : list<SqlTable> = 
+                    connection
+                    |> Sql.connect
+                    |> Sql.queryMany [store; storeMetadata]
+                    |> Sql.executeMany
+                Expect.equal 2 (List.length tables) "Check number of tables"
+                match tables with
+                | [store; metadata] ->            
+                    Expect.equal 
+                        [
+                            [("test_id", SqlValue.Int 1); ("test_name", SqlValue.String "first test")]
+                            [("test_id", SqlValue.Int 2); ("test_name", SqlValue.String "second test")]
+                            [("test_id", SqlValue.Int 3); ("test_name", SqlValue.String "third test")]
+                        ]
+                        store
+                        "Check all rows from `fsharp_test` table"
+                    Expect.equal 
+                        [
+                            [("column_name", SqlValue.String "test_id"); ("data_type", SqlValue.String "integer")]
+                            [("column_name", SqlValue.String "test_name"); ("data_type", SqlValue.String "text")]
+                        ]
+                        metadata
+                        "Check metadata rows"
+                | _ -> failwith "Invalid branch"
+            }
+
         ] |> testSequenced
 
     ]
