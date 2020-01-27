@@ -70,6 +70,9 @@ let buildDatabase (connection: string) : unit =
     |> ignore
 
 let cleanDatabase (connection: string) : unit =
+    // WARNING: Dropping HStore extension throws similar exception to the following one 
+    // in the test that uses it:
+    //   Npgsql.PostgresException (0x80004005): XX000: cache lookup failed for type xxxxx
     let dropFSharpTable = "drop table if exists fsharp_test"
     let dropIntArrayTable = "drop table if exists int_array_test"
     let dropStringArrayTable = "drop table if exists string_array_test"
