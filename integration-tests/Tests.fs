@@ -1117,6 +1117,65 @@ let tests =
                     "All rows from `string_array_test` table using `mapEachRow`"                     
             }
 
+            test "Handle int Array" {
+                let a = [| 1; 2 |]
+                let b = [| for i in 0..10 do yield i |]
+                let c : int array = [||]
+                let seedDatabase (connection: string) =
+                    connection
+                    |> Sql.connect
+                    |> Sql.executeTransaction [
+                        "INSERT INTO int_array_test (id, integers) values (@id, @integers)", [
+                            [ "@id", Sql.Value 1; "@integers", Sql.Value a ]
+                            [ "@id", Sql.Value 2; "@integers", Sql.Value b ]
+                            [ "@id", Sql.Value 3; "@integers", Sql.Value c ]
+                        ]
+                    ]
+                    |> ignore
+
+                cleanDatabase connection
+                buildDatabase connection
+                seedDatabase connection
+
+                // Use `parseEachRow<T>`
+                let table = 
+                    defaultConnection()
+                    |> Sql.connect
+                    |> Sql.query "SELECT * FROM int_array_test"
+                    |> Sql.executeTable
+                    |> Sql.parseEachRow<IntArrayTest>
+                Expect.equal
+                    [
+                        { id = 1; integers = a }
+                        { id = 2; integers = b }
+                        { id = 3; integers = c }
+                    ]
+                    table
+                    "All rows from `int_array_test` table using `parseEachRow`"
+
+                // Use `mapEachRow` + `readStringArray`
+                let table = 
+                    defaultConnection()
+                    |> Sql.connect
+                    |> Sql.query "SELECT * FROM int_array_test"
+                    |> Sql.prepare
+                    |> Sql.executeTable
+                    |> Sql.mapEachRow (fun row ->
+                        option {
+                            let! id = Sql.readInt "id" row
+                            let! integers = Sql.readIntArray "integers" row
+                            return { id = id; integers = integers }
+                        })
+                Expect.equal
+                    [
+                        { id = 1; integers = a }
+                        { id = 2; integers = b }
+                        { id = 3; integers = c }
+                    ]
+                    table
+                    "All rows from `int_array_test` table using `mapEachRow`"                  
+            }
+
         ] |> testSequenced
 
     ]
