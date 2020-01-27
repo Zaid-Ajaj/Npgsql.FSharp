@@ -736,6 +736,19 @@ let tests =
                 | _ -> failwith "Invalid branch"
             }
 
+            test "Local UTC time" {
+                let now : DateTime = DateTime.UtcNow
+                let nowTime : TimeSpan = now.TimeOfDay
+                let dbTime = 
+                    defaultConnection()
+                    |> Sql.connect
+                    |> Sql.query "SELECT localtime"
+                    |> Sql.executeScalar
+                    |> Sql.toTime
+                let later : TimeSpan = now.AddMinutes(1.0).TimeOfDay
+                Expect.isAscending [nowTime; dbTime; later] "Check database `localtime` function is accurate"
+            }
+
         ]
 
     ]
