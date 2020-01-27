@@ -812,6 +812,43 @@ let tests =
                     "Check all rows from `fsharp_test` table"
             }
 
+            test "Sql.mapEachRow" {
+                let seedDatabase (connection: string) =
+                    connection
+                    |> Sql.connect
+                    |> Sql.executeTransaction [
+                        "INSERT INTO fsharp_test (test_id, test_name) values (@id, @name)", [
+                            [ "@id", Sql.Value 1; "@name", Sql.Value "first test" ]
+                            [ "@id", Sql.Value 2; "@name", Sql.Value "second test" ]
+                            [ "@id", Sql.Value 3; "@name", Sql.Value "third test" ]
+                        ]
+                    ]
+                    |> ignore
+                cleanDatabase connection
+                buildDatabase connection
+                seedDatabase connection    
+                let table : list<FsTest> = 
+                    connection
+                    |> Sql.connect
+                    |> Sql.query "SELECT * FROM fsharp_test"
+                    |> Sql.prepare
+                    |> Sql.executeTable
+                    |> Sql.mapEachRow (fun row ->
+                        option {
+                            let! id = Sql.readInt "test_id" row
+                            let! name = Sql.readString "test_name" row
+                            return { test_id = id; test_name = name }
+                        })
+                Expect.equal 
+                    [
+                        { test_id = 1; test_name = "first test" }
+                        { test_id = 2; test_name = "second test" }
+                        { test_id = 3; test_name = "third test" }
+                    ]
+                    table
+                    "Check all rows from `fsharp_test` table after mapping them" 
+            }
+
         ] |> testSequenced
 
     ]
