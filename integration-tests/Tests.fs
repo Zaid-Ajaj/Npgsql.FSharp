@@ -76,9 +76,11 @@ let cleanDatabase (connection: string) : unit =
     let dropTimespanTable = "drop table if exists timespan_test"
     let dropTimestampzTable = "drop table if exists timestampz_test"
     let dropJsonbTable = "drop table if exists data_with_jsonb"
+    let dropExtensionUuid = "drop extension if exists \"uuid-ossp\""
     connection
     |> Sql.connect
     |> Sql.queryMany [
+        dropExtensionUuid
         dropIntArrayTable
         dropStringArrayTable
         dropTimespanTable
