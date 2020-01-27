@@ -676,8 +676,25 @@ let tests =
                 Expect.isAscending [now; databaseNow; later] "Check database `now` function is accurate"
             }
 
+            testAsync "Reading time with reader safe async" {
+                let now : DateTime = DateTime.UtcNow
+                let! databaseNowColl =
+                    connection
+                    |> Sql.connect
+                    |> Sql.query "SELECT NOW()::timestamp AS time"
+                    |> Sql.executeReaderSafeAsync (Sql.readRow >> Sql.readTimestamp "time")
+                let later : DateTime = now.AddMinutes(1.0)
+                Expect.isOk databaseNowColl "Check Result value from database"
+                databaseNowColl 
+                |> Result.map (fun coll -> 
+                    Expect.equal 1 (List.length coll) "Check list is a singleton"
+                    let databaseNow = List.head coll
+                    Expect.isAscending [now; databaseNow; later] "Check database `now` function is accurate")
+                |> ignore
+            }
+
         ]
-        
+
     ]
 
 [<EntryPoint>]
