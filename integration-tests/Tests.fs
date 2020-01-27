@@ -625,6 +625,18 @@ let tests =
                     |> Sql.executeScalar
                 Expect.equal SqlValue.Null queryOutput "Check null value returned from database is the same sent"
             }
+
+            test "Reading time" {     
+                let now : DateTime = DateTime.UtcNow
+                let databaseNow : DateTime =
+                    connection
+                    |> Sql.connect
+                    |> Sql.query "SELECT TIMEZONE('utc', NOW())"
+                    |> Sql.executeScalar
+                    |> Sql.toDateTime
+                let later : DateTime = now.AddMinutes(1.0)
+                Expect.isAscending [now; databaseNow; later] "Check database `now` function is accurate"
+            }
             
         ]
     ]
