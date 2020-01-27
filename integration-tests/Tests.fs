@@ -956,6 +956,25 @@ let tests =
                 Expect.equal (SqlValue.String jsonData) dbJson "Check json read from database"   
             }
 
+            test "Infinity time" {
+                let seedDatabase (connection: string) =
+                    connection
+                    |> Sql.connect
+                    |> Sql.query "INSERT INTO timestampz_test (version, date1, date2) values (1, 'now', 'infinity')"
+                    |> Sql.executeNonQuery
+                    |> ignore
+                cleanDatabase connection
+                buildDatabase connection
+                seedDatabase connection
+
+                let dataTable : Result<SqlTable, exn> = 
+                    defaultConnection()
+                    |> Sql.connect
+                    |> Sql.query "SELECT * FROM timestampz_test"
+                    |> Sql.executeTableSafe
+                Expect.isError dataTable "Don't convert infinite timestampz value to DateTime"            
+            }
+
         ] |> testSequenced
 
     ]
