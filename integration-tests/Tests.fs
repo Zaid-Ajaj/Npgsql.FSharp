@@ -48,15 +48,6 @@ let defaultConnection() =
     |> Sql.database "postgres"
     |> Sql.str
 
-let config() =
-    Sql.host "localhost"
-    |> Sql.port 5432
-    |> Sql.username "postgres"
-    |> Sql.password "postgres"
-    |> Sql.database "postgres"
-    |> Sql.sslMode SslMode.Require
-    |> Sql.trustServerCertificate true
-
 let seedDefaultDatabase() =
     defaultConnection()
     |> Sql.connect
