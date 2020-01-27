@@ -693,6 +693,17 @@ let tests =
                 |> ignore
             }
 
+            test "Bytea roundtrip" {
+                let bytesInput : array<byte> = [1 .. 5] |> List.map byte |> Array.ofList
+                let dbBytes : SqlValue = 
+                    defaultConnection()
+                    |> Sql.connect
+                    |> Sql.query "SELECT @manyBytes"
+                    |> Sql.parameters [ "manyBytes", Sql.Value bytesInput ]
+                    |> Sql.executeScalar
+                Expect.equal (SqlValue.Bytea bytesInput) dbBytes "Check bytes read from database are the same sent"   
+            }
+
         ]
 
     ]
