@@ -1055,6 +1055,68 @@ let tests =
                     "All rows from `timespan_test` table using `mapEachRow`"                               
             }
 
+            test "Handle String Array" {
+                let getString () =
+                    let temp = Guid.NewGuid()
+                    temp.ToString("N")
+                let a = [| getString() |]
+                let b = [| getString(); getString() |]
+                let c : string array = [||]
+                let seedDatabase (connection: string) =
+                    connection
+                    |> Sql.connect
+                    |> Sql.executeTransaction [
+                        "INSERT INTO string_array_test (id, values) values (@id, @values)", [
+                            [ "@id", Sql.Value 1; "@values", Sql.Value a ]
+                            [ "@id", Sql.Value 2; "@values", Sql.Value b ]
+                            [ "@id", Sql.Value 3; "@values", Sql.Value c ]
+                        ]
+                    ]
+                    |> ignore
+
+                cleanDatabase connection
+                buildDatabase connection
+                seedDatabase connection                
+
+                // Use `parseEachRow<T>`
+                let table = 
+                    defaultConnection()
+                    |> Sql.connect
+                    |> Sql.query "SELECT * FROM string_array_test"
+                    |> Sql.executeTable
+                    |> Sql.parseEachRow<StringArrayTest>
+                Expect.equal
+                    [
+                        { id = 1; values = a }
+                        { id = 2; values = b }
+                        { id = 3; values = c }
+                    ]
+                    table
+                    "All rows from `string_array_test` table using `parseEachRow`"
+
+                // Use `mapEachRow` + `readStringArray`
+                let table = 
+                    defaultConnection()
+                    |> Sql.connect
+                    |> Sql.query "SELECT * FROM string_array_test"
+                    |> Sql.prepare
+                    |> Sql.executeTable
+                    |> Sql.mapEachRow (fun row ->
+                        option {
+                            let! id = Sql.readInt "id" row
+                            let! values = Sql.readStringArray "values" row
+                            return { id = id; values = values }
+                        })
+                Expect.equal
+                    [
+                        { id = 1; values = a }
+                        { id = 2; values = b }
+                        { id = 3; values = c }
+                    ]
+                    table
+                    "All rows from `string_array_test` table using `mapEachRow`"                     
+            }
+
         ] |> testSequenced
 
     ]
