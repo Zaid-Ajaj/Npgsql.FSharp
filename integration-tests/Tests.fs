@@ -934,6 +934,28 @@ let tests =
                 | _ -> failwith "Invalid branch"
             }
 
+            test "Create table with Jsonb data" {
+                let seedDatabase (connection: string) (json: string) =
+                    connection
+                    |> Sql.connect
+                    |> Sql.query "INSERT INTO data_with_jsonb (data) VALUES (@jsonb)"
+                    |> Sql.parameters ["jsonb", SqlValue.Jsonb json]
+                    |> Sql.executeNonQuery
+                    |> ignore
+                let jsonData = "value from F#"
+                let inputJson = "{\"property\": \"" + jsonData + "\"}"
+                cleanDatabase connection
+                buildDatabase connection
+                seedDatabase connection inputJson
+
+                let dbJson : SqlValue =
+                    defaultConnection()
+                    |> Sql.connect
+                    |> Sql.query "SELECT data ->> 'property' FROM data_with_jsonb"
+                    |> Sql.executeScalar           
+                Expect.equal (SqlValue.String jsonData) dbJson "Check json read from database"   
+            }
+
         ] |> testSequenced
 
     ]
