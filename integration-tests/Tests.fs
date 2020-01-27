@@ -780,6 +780,40 @@ let tests =
 
         ]
 
+        testList "Sequencial tests that update database state" [
+
+            test "Simple select and Sql.executeTable" {
+                let seedDatabase (connection: string) : unit =
+                    connection
+                    |> Sql.connect
+                    |> Sql.executeTransaction [
+                        "INSERT INTO fsharp_test (test_id, test_name) values (@id, @name)", [
+                            [ "@id", Sql.Value 1; "@name", Sql.Value "first test" ]
+                            [ "@id", Sql.Value 2; "@name", Sql.Value "second test" ]
+                            [ "@id", Sql.Value 3; "@name", Sql.Value "third test" ]
+                        ]
+                    ]
+                    |> ignore
+                cleanDatabase connection
+                buildDatabase connection
+                seedDatabase connection                
+                let table : SqlTable = 
+                    connection
+                    |> Sql.connect
+                    |> Sql.query "SELECT * FROM fsharp_test"
+                    |> Sql.executeTable
+                Expect.equal 
+                    [
+                        [("test_id", SqlValue.Int 1); ("test_name", SqlValue.String "first test")]
+                        [("test_id", SqlValue.Int 2); ("test_name", SqlValue.String "second test")]
+                        [("test_id", SqlValue.Int 3); ("test_name", SqlValue.String "third test")]
+                    ]
+                    table
+                    "Check all rows from `fsharp_test` table"
+            }
+
+        ] |> testSequenced
+
     ]
 
 [<EntryPoint>]
