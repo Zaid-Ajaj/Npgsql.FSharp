@@ -715,6 +715,16 @@ let tests =
                 Expect.equal (SqlValue.Uuid guid) dbUuid "Check uuid read from database is the same sent" 
             }
 
+            test "Money roundtrip" {
+                let dbMoney : SqlValue =
+                    defaultConnection()
+                    |> Sql.connect
+                    |> Sql.query "SELECT @money_input::money"
+                    |> Sql.parameters [ "money_input", Sql.Value 12.5M ]
+                    |> Sql.executeScalar
+                Expect.equal (SqlValue.Decimal 12.5M) dbMoney "Check money as decimal read from database is the same sent"        
+            }
+
         ]
 
     ]
