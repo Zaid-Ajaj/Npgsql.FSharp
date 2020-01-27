@@ -704,6 +704,17 @@ let tests =
                 Expect.equal (SqlValue.Bytea bytesInput) dbBytes "Check bytes read from database are the same sent"   
             }
 
+            test "Uuid roundtrip" {
+                let guid : Guid = Guid.NewGuid()
+                let dbUuid : SqlValue =
+                    defaultConnection()
+                    |> Sql.connect
+                    |> Sql.query "SELECT @uuid_input"
+                    |> Sql.parameters [ "uuid_input", Sql.Value guid ]
+                    |> Sql.executeScalar
+                Expect.equal (SqlValue.Uuid guid) dbUuid "Check uuid read from database is the same sent" 
+            }
+
         ]
 
     ]
