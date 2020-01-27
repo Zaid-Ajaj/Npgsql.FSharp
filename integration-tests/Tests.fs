@@ -749,6 +749,21 @@ let tests =
                 Expect.isAscending [nowTime; dbTime; later] "Check database `localtime` function is accurate"
             }
 
+            test "String option roundtrip" {
+                let a : string option = Some "abc"
+                let b : string option = None
+                let table =
+                    defaultConnection()
+                    |> Sql.connect
+                    |> Sql.query "SELECT @a, @b"
+                    |> Sql.parameters [ "a", Sql.Value a; "b", Sql.Value b ]
+                    |> Sql.executeTable
+                match table with
+                | [[(_, SqlValue.String output); (_, SqlValue.Null)]] ->
+                    Expect.equal a (Some output) "Check Option value read from database is the same sent" 
+                | _ -> failwith "Invalid branch"  
+            }
+
         ]
 
     ]
