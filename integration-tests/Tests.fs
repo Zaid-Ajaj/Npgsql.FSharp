@@ -561,6 +561,26 @@ defaultConnection()
 
 cleanupDefaultDatabase()
 
+let cleanDatabase (connection: string) : unit =
+    let dropFSharpTable = "drop table if exists fsharp_test"
+    let dropIntArrayTable = "drop table if exists int_array_test"
+    let dropStringArrayTable = "drop table if exists string_array_test"
+    let dropTimespanTable = "drop table if exists timespan_test"
+    let dropTimestampzTable = "drop table if exists timestampz_test"
+    let dropJsonbTable = "drop table if exists data_with_jsonb"
+    connection
+    |> Sql.connect
+    |> Sql.queryMany [
+        dropIntArrayTable
+        dropStringArrayTable
+        dropTimespanTable
+        dropTimestampzTable
+        dropJsonbTable
+        dropFSharpTable
+    ]
+    |> Sql.executeMany
+    |> ignore
+
 let tests =
 
     testList "Integration tests" [
