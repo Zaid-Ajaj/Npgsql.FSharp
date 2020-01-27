@@ -41,9 +41,6 @@ let handleInfinityConnection() =
     |> Sql.database "postgres"
     |> Sql.convertInfinityDateTime true
     |> Sql.str
-    |> fun x ->
-        printfn "%s" x
-        x
 
 let buildDatabase (connection: string) : unit =
     let createFSharpTable = "create table fsharp_test (test_id int, test_name text)"
