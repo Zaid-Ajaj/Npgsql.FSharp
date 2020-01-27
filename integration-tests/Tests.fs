@@ -975,6 +975,28 @@ let tests =
                 Expect.isError dataTable "Don't convert infinite timestampz value to DateTime"            
             }
 
+            test "Handle infinity connection" {
+                let seedDatabase (connection: string) =
+                    connection
+                    |> Sql.connect
+                    |> Sql.query "INSERT INTO timestampz_test (version, date1, date2) values (1, 'now', 'infinity')"
+                    |> Sql.executeNonQuery
+                    |> ignore
+                cleanDatabase connection
+                buildDatabase connection
+                seedDatabase connection
+                let dataTable : Result<SqlTable, exn> =
+                    handleInfinityConnection()
+                    |> Sql.connect
+                    |> Sql.query "SELECT date2 FROM timestampz_test"
+                    |> Sql.executeTableSafe
+                Expect.isOk dataTable "Check query returns Ok Result"
+                match dataTable with
+                | Ok [[("date2", SqlValue.TimestampWithTimeZone d)]] -> 
+                    Expect.equal d DateTime.MaxValue "Database infinite is returned as max value of DateTime"
+                | _ -> failwith "Invalid branch"
+            }
+
         ] |> testSequenced
 
     ]
