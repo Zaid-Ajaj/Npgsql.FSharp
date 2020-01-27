@@ -997,6 +997,64 @@ let tests =
                 | _ -> failwith "Invalid branch"
             }
 
+            test "Handle TimeSpan" {
+                let t1 = TimeSpan(13, 45, 23)
+                let t2 = TimeSpan(16, 17, 09)
+                let t3 = TimeSpan(20, 02, 56)
+                let seedDatabase (connection: string) =
+                    connection
+                    |> Sql.connect
+                    |> Sql.executeTransaction [
+                        "INSERT INTO timespan_test (id, at) values (@id, @at)", [
+                            [ "@id", Sql.Value 1; "@at", Sql.Value t1 ]
+                            [ "@id", Sql.Value 2; "@at", Sql.Value t2 ]
+                            [ "@id", Sql.Value 3; "@at", Sql.Value t3 ]
+                        ]
+                    ]
+                    |> ignore
+                cleanDatabase connection
+                buildDatabase connection
+                seedDatabase connection       
+
+                // Use `parseEachRow<T>`
+                let table : list<TimeSpanTest> = 
+                    defaultConnection()
+                    |> Sql.connect
+                    |> Sql.query "SELECT * FROM timespan_test"
+                    |> Sql.executeTable
+                    |> Sql.parseEachRow<TimeSpanTest>
+                Expect.equal
+                    [
+                        { id = 1; at = t1 }
+                        { id = 2; at = t2 }
+                        { id = 3; at = t3 }
+                    ]
+                    table
+                    "All rows from `timespan_test` table using `parseEachRow`"
+
+                // Use `mapEachRow` + `readTime`
+                let table = 
+                    defaultConnection()
+                    |> Sql.connect
+                    |> Sql.query "SELECT * FROM timespan_test"
+                    |> Sql.prepare
+                    |> Sql.executeTable
+                    |> Sql.mapEachRow (fun row ->
+                        option {
+                            let! id = Sql.readInt "id" row
+                            let! at = Sql.readTime "at" row
+                            return { id = id; at = at }
+                        })     
+                Expect.equal
+                    [
+                        { id = 1; at = TimeSpan(13, 45, 23) }
+                        { id = 2; at = TimeSpan(16, 17, 09) }
+                        { id = 3; at = TimeSpan(20, 02, 56) }
+                    ]
+                    table
+                    "All rows from `timespan_test` table using `mapEachRow`"                               
+            }
+
         ] |> testSequenced
 
     ]
