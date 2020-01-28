@@ -627,7 +627,12 @@ module Sql =
                   |> Map.toList
                   |> dict
                   |> Dictionary
-                upcast value, None
+                // Reload the types to discover the HStore. Fixes following error in first launch
+                // of tests.
+                // -- The NpgsqlDbType 'Hstore' isn't present in your database. You may need to 
+                // install an extension or upgrade to a newer version. --
+                cmd.Connection.ReloadTypes()
+                upcast value, Some NpgsqlTypes.NpgsqlDbType.Hstore
             | SqlValue.Jsonb x -> upcast x, Some NpgsqlTypes.NpgsqlDbType.Jsonb
             | SqlValue.Time x -> upcast x, None
             | SqlValue.StringArray x -> upcast x, Some (NpgsqlTypes.NpgsqlDbType.Array ||| NpgsqlTypes.NpgsqlDbType.Text )
