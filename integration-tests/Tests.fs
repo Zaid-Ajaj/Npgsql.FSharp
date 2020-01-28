@@ -43,9 +43,9 @@ let handleInfinityConnection() =
     |> Sql.str
 
 let buildDatabase (connection: string) : unit =
-    let createFSharpTable = "create table fsharp_test (test_id int, test_name text)"
-    let createJsonbTable = "create table data_with_jsonb (data jsonb)"
-    let createTimestampzTable = "create table timestampz_test (version integer, date1 timestamptz, date2 timestamptz)"
+    let createFSharpTable = "create table if not exists fsharp_test (test_id int, test_name text)"
+    let createJsonbTable = "create table if not exists data_with_jsonb (data jsonb)"
+    let createTimestampzTable = "create table if not exists timestampz_test (version integer, date1 timestamptz, date2 timestamptz)"
     let createTimespanTable = "create table if not exists timespan_test (id int, at time without time zone)"
     let createStringArrayTable = "create table if not exists string_array_test (id int, values text [])"
     let createIntArrayTable = "create table if not exists int_array_test (id int, integers int [])"
