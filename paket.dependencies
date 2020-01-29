@@ -11,6 +11,7 @@ group Build
 
   nuget FAKE
 
-group Test  
+group Test
   source https://api.nuget.org/v3/index.json
   nuget Expecto
+  nuget ThrowawayDb.Postgres

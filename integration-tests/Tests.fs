@@ -4,6 +4,7 @@ open Expecto
 open Npgsql.FSharp
 open Npgsql.FSharp.OptionWorkflow
 open System
+open ThrowawayDb.Postgres
 
 type FsTest = {
     test_id: int
@@ -25,24 +26,7 @@ type IntArrayTest = {
     integers: int array
 }
 
-let defaultConnection() =
-    Sql.host "localhost"
-    |> Sql.port 5432
-    |> Sql.username "postgres"
-    |> Sql.password "postgres"
-    |> Sql.database "postgres"
-    |> Sql.str
-
-let handleInfinityConnection() =
-    Sql.host "localhost"
-    |> Sql.port 5432
-    |> Sql.username "postgres"
-    |> Sql.password "postgres"
-    |> Sql.database "postgres"
-    |> Sql.convertInfinityDateTime true
-    |> Sql.str
-
-let buildDatabase (connection: string) : unit =
+let buildDatabaseConnection handleInfinity : ThrowawayDatabase =
     let createFSharpTable = "create table if not exists fsharp_test (test_id int, test_name text)"
     let createJsonbTable = "create table if not exists data_with_jsonb (data jsonb)"
     let createTimestampzTable = "create table if not exists timestampz_test (version integer, date1 timestamptz, date2 timestamptz)"
@@ -51,7 +35,18 @@ let buildDatabase (connection: string) : unit =
     let createIntArrayTable = "create table if not exists int_array_test (id int, integers int [])"
     let createExtensionHStore = "create extension if not exists hstore"
     let createExtensionUuid = "create extension if not exists \"uuid-ossp\""
-    connection
+
+    let connection =
+        Sql.host "localhost"
+        |> Sql.port 5432
+        |> Sql.username "postgres"
+        |> Sql.password "postgres"
+        |> Sql.convertInfinityDateTime handleInfinity
+        |> Sql.str
+
+    let database = ThrowawayDatabase.Create(connection)
+
+    database.ConnectionString
     |> Sql.connect
     |> Sql.queryMany [
         createFSharpTable
@@ -66,43 +61,17 @@ let buildDatabase (connection: string) : unit =
     |> Sql.executeMany
     |> ignore
 
-let cleanDatabase (connection: string) : unit =
-    // WARNING: Dropping HStore extension throws similar exception to the following one 
-    // in the test that uses it:
-    //   Npgsql.PostgresException (0x80004005): XX000: cache lookup failed for type xxxxx
-    let dropFSharpTable = "drop table if exists fsharp_test"
-    let dropIntArrayTable = "drop table if exists int_array_test"
-    let dropStringArrayTable = "drop table if exists string_array_test"
-    let dropTimespanTable = "drop table if exists timespan_test"
-    let dropTimestampzTable = "drop table if exists timestampz_test"
-    let dropJsonbTable = "drop table if exists data_with_jsonb"
-    let dropExtensionUuid = "drop extension if exists \"uuid-ossp\""
-    connection
-    |> Sql.connect
-    |> Sql.queryMany [
-        dropExtensionUuid
-        dropIntArrayTable
-        dropStringArrayTable
-        dropTimespanTable
-        dropTimestampzTable
-        dropJsonbTable
-        dropFSharpTable
-    ]
-    |> Sql.executeMany
-    |> ignore
+    database
+
+let buildDatabase() = buildDatabaseConnection false
+let buildInfinityDatabase() = buildDatabaseConnection true
 
 let tests =
-
     testList "Integration tests" [
-        
-        // Setup: Run once for all tests.
-        let connection : string = defaultConnection()
-        cleanDatabase connection
-        buildDatabase connection
-
         testList "Query-only parallel tests without recreating database" [
-
             test "Null roundtrip" {
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
                 let queryOutput : SqlValue =
                     connection
                     |> Sql.connect
@@ -112,7 +81,9 @@ let tests =
                 Expect.equal SqlValue.Null queryOutput "Check null value returned from database is the same sent"
             }
 
-            test "Reading time" {     
+            test "Reading time" {
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
                 let now : DateTime = DateTime.UtcNow
                 let databaseNow : DateTime =
                     connection
@@ -123,8 +94,10 @@ let tests =
                 let later : DateTime = now.AddMinutes(1.0)
                 Expect.isAscending [now; databaseNow; later] "Check database `now` function is accurate"
             }
-            
+
             test "Reading time with reader" {
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
                 let now : DateTime = DateTime.UtcNow
                 let databaseNowColl : list<DateTime> =
                     connection
@@ -135,9 +108,11 @@ let tests =
                 Expect.equal 1 (List.length databaseNowColl) "Check list is a singleton"
                 let databaseNow = List.head databaseNowColl
                 Expect.isAscending [now; databaseNow; later] "Check database `now` function is accurate"
-            } 
+            }
 
             test "Jsonb roundtrip" {
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
                 let jsonData = "value from F#"
                 let inputJson = "{\"property\": \"" + jsonData + "\"}"
                 let jsonValue : SqlValue =
@@ -150,6 +125,8 @@ let tests =
             }
 
             testAsync "Reading time with reader async" {
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
                 let now : DateTime = DateTime.UtcNow
                 let! databaseNowColl =
                     connection
@@ -163,6 +140,8 @@ let tests =
             }
 
             testAsync "Reading time with reader safe async" {
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
                 let now : DateTime = DateTime.UtcNow
                 let! databaseNowColl =
                     connection
@@ -171,8 +150,8 @@ let tests =
                     |> Sql.executeReaderSafeAsync (Sql.readRow >> Sql.readTimestamp "time")
                 let later : DateTime = now.AddMinutes(1.0)
                 Expect.isOk databaseNowColl "Check Result value from database"
-                databaseNowColl 
-                |> Result.map (fun coll -> 
+                databaseNowColl
+                |> Result.map (fun coll ->
                     Expect.equal 1 (List.length coll) "Check list is a singleton"
                     let databaseNow = List.head coll
                     Expect.isAscending [now; databaseNow; later] "Check database `now` function is accurate")
@@ -180,40 +159,48 @@ let tests =
             }
 
             test "Bytea roundtrip" {
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
                 let bytesInput : array<byte> = [1 .. 5] |> List.map byte |> Array.ofList
-                let dbBytes : SqlValue = 
-                    defaultConnection()
+                let dbBytes : SqlValue =
+                    connection
                     |> Sql.connect
                     |> Sql.query "SELECT @manyBytes"
                     |> Sql.parameters [ "manyBytes", Sql.Value bytesInput ]
                     |> Sql.executeScalar
-                Expect.equal (SqlValue.Bytea bytesInput) dbBytes "Check bytes read from database are the same sent"   
+                Expect.equal (SqlValue.Bytea bytesInput) dbBytes "Check bytes read from database are the same sent"
             }
 
             test "Uuid roundtrip" {
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
                 let guid : Guid = Guid.NewGuid()
                 let dbUuid : SqlValue =
-                    defaultConnection()
+                    connection
                     |> Sql.connect
                     |> Sql.query "SELECT @uuid_input"
                     |> Sql.parameters [ "uuid_input", Sql.Value guid ]
                     |> Sql.executeScalar
-                Expect.equal (SqlValue.Uuid guid) dbUuid "Check uuid read from database is the same sent" 
+                Expect.equal (SqlValue.Uuid guid) dbUuid "Check uuid read from database is the same sent"
             }
 
             test "Money roundtrip" {
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
                 let dbMoney : SqlValue =
-                    defaultConnection()
+                    connection
                     |> Sql.connect
                     |> Sql.query "SELECT @money_input::money"
                     |> Sql.parameters [ "money_input", Sql.Value 12.5M ]
                     |> Sql.executeScalar
-                Expect.equal (SqlValue.Decimal 12.5M) dbMoney "Check money as decimal read from database is the same sent"        
+                Expect.equal (SqlValue.Decimal 12.5M) dbMoney "Check money as decimal read from database is the same sent"
             }
 
             test "uuid_generate_v4()" {
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
                 let dbUuid : SqlValue =
-                    defaultConnection()
+                    connection
                     |> Sql.connect
                     |> Sql.query "SELECT uuid_generate_v4()"
                     |> Sql.executeScalar
@@ -223,10 +210,12 @@ let tests =
             }
 
             test "Local UTC time" {
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
                 let now : DateTime = DateTime.UtcNow
                 let nowTime : TimeSpan = now.TimeOfDay
-                let dbTime = 
-                    defaultConnection()
+                let dbTime =
+                    connection
                     |> Sql.connect
                     |> Sql.query "SELECT localtime"
                     |> Sql.executeScalar
@@ -236,37 +225,40 @@ let tests =
             }
 
             test "String option roundtrip" {
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
                 let a : string option = Some "abc"
                 let b : string option = None
                 let table =
-                    defaultConnection()
+                    connection
                     |> Sql.connect
                     |> Sql.query "SELECT @a, @b"
                     |> Sql.parameters [ "a", Sql.Value a; "b", Sql.Value b ]
                     |> Sql.executeTable
                 match table with
                 | [[(_, SqlValue.String output); (_, SqlValue.Null)]] ->
-                    Expect.equal a (Some output) "Check Option value read from database is the same sent" 
-                | _ -> failwith "Invalid branch"  
+                    Expect.equal a (Some output) "Check Option value read from database is the same sent"
+                | _ -> failwith "Invalid branch"
             }
 
-            // Unhandled Exception: System.NotSupportedException: Npgsql 3.x removed support 
+            // Unhandled Exception: System.NotSupportedException: Npgsql 3.x removed support
             // for writing a parameter with an IEnumerable value, use .ToList()/.ToArray() instead.
             // Need to add a NpgsqlTypeHandler for Map ?
             test "HStore roundtrip" {
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
                 let inputMap : Map<string, string> = Map ["property", "value from F#"]
-                let value = 
+                let value =
                     connection
                     |> Sql.connect
                     |> Sql.query "select @map"
                     |> Sql.parameters ["map", Sql.Value inputMap]
                     |> Sql.executeScalar
-                Expect.equal (SqlValue.HStore inputMap) value "Check hstore value read from database is the same sent"                           
+                Expect.equal (SqlValue.HStore inputMap) value "Check hstore value read from database is the same sent"
             }
-
         ]
 
-        testList "Sequencial tests that update database state" [
+        testList "Sequential tests that update database state" [
 
             test "Simple select and Sql.executeTable" {
                 let seedDatabase (connection: string) : unit =
@@ -280,15 +272,15 @@ let tests =
                         ]
                     ]
                     |> ignore
-                cleanDatabase connection
-                buildDatabase connection
-                seedDatabase connection                
-                let table : SqlTable = 
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
+                seedDatabase connection
+                let table : SqlTable =
                     connection
                     |> Sql.connect
                     |> Sql.query "SELECT * FROM fsharp_test"
                     |> Sql.executeTable
-                Expect.equal 
+                Expect.equal
                     [
                         [("test_id", SqlValue.Int 1); ("test_name", SqlValue.String "first test")]
                         [("test_id", SqlValue.Int 2); ("test_name", SqlValue.String "second test")]
@@ -310,10 +302,10 @@ let tests =
                         ]
                     ]
                     |> ignore
-                cleanDatabase connection
-                buildDatabase connection
-                seedDatabase connection    
-                let table : list<FsTest> = 
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
+                seedDatabase connection
+                let table : list<FsTest> =
                     connection
                     |> Sql.connect
                     |> Sql.query "SELECT * FROM fsharp_test"
@@ -325,14 +317,14 @@ let tests =
                             let! name = Sql.readString "test_name" row
                             return { test_id = id; test_name = name }
                         })
-                Expect.equal 
+                Expect.equal
                     [
                         { test_id = 1; test_name = "first test" }
                         { test_id = 2; test_name = "second test" }
                         { test_id = 3; test_name = "third test" }
                     ]
                     table
-                    "Check all rows from `fsharp_test` table after mapping them" 
+                    "Check all rows from `fsharp_test` table after mapping them"
             }
 
             test "Sql.executeReader" {
@@ -347,8 +339,8 @@ let tests =
                         ]
                     ]
                     |> ignore
-                cleanDatabase connection
-                buildDatabase connection
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
                 seedDatabase connection
                 let table : list<FsTest> =
                     connection
@@ -361,8 +353,8 @@ let tests =
                             let! id = Sql.readInt "test_id" row
                             let! name = Sql.readString "test_name" row
                             return { test_id = id; test_name = name }
-                        })    
-                Expect.equal 
+                        })
+                Expect.equal
                     [
                         { test_id = 1; test_name = "first test" }
                         { test_id = 2; test_name = "second test" }
@@ -384,8 +376,8 @@ let tests =
                         ]
                     ]
                     |> ignore
-                cleanDatabase connection
-                buildDatabase connection
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
                 seedDatabase connection
                 let store : string = "SELECT * FROM fsharp_test"
                 let storeMetadata : string =
@@ -394,15 +386,15 @@ let tests =
                         "from information_schema.columns"
                         "where table_name = 'fsharp_test'"
                     ]
-                let tables : list<SqlTable> = 
+                let tables : list<SqlTable> =
                     connection
                     |> Sql.connect
                     |> Sql.queryMany [store; storeMetadata]
                     |> Sql.executeMany
                 Expect.equal 2 (List.length tables) "Check number of tables"
                 match tables with
-                | [store; metadata] ->            
-                    Expect.equal 
+                | [store; metadata] ->
+                    Expect.equal
                         [
                             [("test_id", SqlValue.Int 1); ("test_name", SqlValue.String "first test")]
                             [("test_id", SqlValue.Int 2); ("test_name", SqlValue.String "second test")]
@@ -410,7 +402,7 @@ let tests =
                         ]
                         store
                         "Check all rows from `fsharp_test` table"
-                    Expect.equal 
+                    Expect.equal
                         [
                             [("column_name", SqlValue.String "test_id"); ("data_type", SqlValue.String "integer")]
                             [("column_name", SqlValue.String "test_name"); ("data_type", SqlValue.String "text")]
@@ -430,16 +422,16 @@ let tests =
                     |> ignore
                 let jsonData = "value from F#"
                 let inputJson = "{\"property\": \"" + jsonData + "\"}"
-                cleanDatabase connection
-                buildDatabase connection
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
                 seedDatabase connection inputJson
 
                 let dbJson : SqlValue =
-                    defaultConnection()
+                    connection
                     |> Sql.connect
                     |> Sql.query "SELECT data ->> 'property' FROM data_with_jsonb"
-                    |> Sql.executeScalar           
-                Expect.equal (SqlValue.String jsonData) dbJson "Check json read from database"   
+                    |> Sql.executeScalar
+                Expect.equal (SqlValue.String jsonData) dbJson "Check json read from database"
             }
 
             test "Infinity time" {
@@ -449,16 +441,16 @@ let tests =
                     |> Sql.query "INSERT INTO timestampz_test (version, date1, date2) values (1, 'now', 'infinity')"
                     |> Sql.executeNonQuery
                     |> ignore
-                cleanDatabase connection
-                buildDatabase connection
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
                 seedDatabase connection
 
-                let dataTable : Result<SqlTable, exn> = 
-                    defaultConnection()
+                let dataTable : Result<SqlTable, exn> =
+                    connection
                     |> Sql.connect
                     |> Sql.query "SELECT * FROM timestampz_test"
                     |> Sql.executeTableSafe
-                Expect.isError dataTable "Don't convert infinite timestampz value to DateTime"            
+                Expect.isError dataTable "Don't convert infinite timestampz value to DateTime"
             }
 
             test "Handle infinity connection" {
@@ -468,17 +460,17 @@ let tests =
                     |> Sql.query "INSERT INTO timestampz_test (version, date1, date2) values (1, 'now', 'infinity')"
                     |> Sql.executeNonQuery
                     |> ignore
-                cleanDatabase connection
-                buildDatabase connection
+                use db = buildInfinityDatabase()
+                let connection : string = db.ConnectionString
                 seedDatabase connection
                 let dataTable : Result<SqlTable, exn> =
-                    handleInfinityConnection()
+                    connection
                     |> Sql.connect
                     |> Sql.query "SELECT date2 FROM timestampz_test"
                     |> Sql.executeTableSafe
                 Expect.isOk dataTable "Check query returns Ok Result"
                 match dataTable with
-                | Ok [[("date2", SqlValue.TimestampWithTimeZone d)]] -> 
+                | Ok [[("date2", SqlValue.TimestampWithTimeZone d)]] ->
                     Expect.equal d DateTime.MaxValue "Database infinite is returned as max value of DateTime"
                 | _ -> failwith "Invalid branch"
             }
@@ -498,13 +490,13 @@ let tests =
                         ]
                     ]
                     |> ignore
-                cleanDatabase connection
-                buildDatabase connection
-                seedDatabase connection       
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
+                seedDatabase connection
 
                 // Use `parseEachRow<T>`
-                let table : list<TimeSpanTest> = 
-                    defaultConnection()
+                let table : list<TimeSpanTest> =
+                    connection
                     |> Sql.connect
                     |> Sql.query "SELECT * FROM timespan_test"
                     |> Sql.executeTable
@@ -519,8 +511,8 @@ let tests =
                     "All rows from `timespan_test` table using `parseEachRow`"
 
                 // Use `mapEachRow` + `readTime`
-                let table = 
-                    defaultConnection()
+                let table =
+                    connection
                     |> Sql.connect
                     |> Sql.query "SELECT * FROM timespan_test"
                     |> Sql.prepare
@@ -530,7 +522,7 @@ let tests =
                             let! id = Sql.readInt "id" row
                             let! at = Sql.readTime "at" row
                             return { id = id; at = at }
-                        })     
+                        })
                 Expect.equal
                     [
                         { id = 1; at = TimeSpan(13, 45, 23) }
@@ -538,7 +530,7 @@ let tests =
                         { id = 3; at = TimeSpan(20, 02, 56) }
                     ]
                     table
-                    "All rows from `timespan_test` table using `mapEachRow`"                               
+                    "All rows from `timespan_test` table using `mapEachRow`"
             }
 
             test "Handle String Array" {
@@ -560,13 +552,13 @@ let tests =
                     ]
                     |> ignore
 
-                cleanDatabase connection
-                buildDatabase connection
-                seedDatabase connection                
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
+                seedDatabase connection
 
                 // Use `parseEachRow<T>`
-                let table = 
-                    defaultConnection()
+                let table =
+                    connection
                     |> Sql.connect
                     |> Sql.query "SELECT * FROM string_array_test"
                     |> Sql.executeTable
@@ -581,8 +573,8 @@ let tests =
                     "All rows from `string_array_test` table using `parseEachRow`"
 
                 // Use `mapEachRow` + `readStringArray`
-                let table = 
-                    defaultConnection()
+                let table =
+                    connection
                     |> Sql.connect
                     |> Sql.query "SELECT * FROM string_array_test"
                     |> Sql.prepare
@@ -600,7 +592,7 @@ let tests =
                         { id = 3; values = c }
                     ]
                     table
-                    "All rows from `string_array_test` table using `mapEachRow`"                     
+                    "All rows from `string_array_test` table using `mapEachRow`"
             }
 
             test "Handle int Array" {
@@ -619,13 +611,13 @@ let tests =
                     ]
                     |> ignore
 
-                cleanDatabase connection
-                buildDatabase connection
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
                 seedDatabase connection
 
                 // Use `parseEachRow<T>`
-                let table = 
-                    defaultConnection()
+                let table =
+                    connection
                     |> Sql.connect
                     |> Sql.query "SELECT * FROM int_array_test"
                     |> Sql.executeTable
@@ -640,8 +632,8 @@ let tests =
                     "All rows from `int_array_test` table using `parseEachRow`"
 
                 // Use `mapEachRow` + `readStringArray`
-                let table = 
-                    defaultConnection()
+                let table =
+                    connection
                     |> Sql.connect
                     |> Sql.query "SELECT * FROM int_array_test"
                     |> Sql.prepare
@@ -659,7 +651,7 @@ let tests =
                         { id = 3; integers = c }
                     ]
                     table
-                    "All rows from `int_array_test` table using `mapEachRow`"                  
+                    "All rows from `int_array_test` table using `mapEachRow`"
             }
 
         ] |> testSequenced
