@@ -229,16 +229,17 @@ let tests =
                 let connection : string = db.ConnectionString
                 let a : string option = Some "abc"
                 let b : string option = None
-                let table =
+                let table : SqlTable =
                     connection
                     |> Sql.connect
                     |> Sql.query "SELECT @a, @b"
                     |> Sql.parameters [ "a", Sql.Value a; "b", Sql.Value b ]
-                    |> Sql.executeTable
+                    |> Sql.executeReader (Sql.readRow >> Some)
                 match table with
                 | [[(_, SqlValue.String output); (_, SqlValue.Null)]] ->
-                    Expect.equal a (Some output) "Check Option value read from database is the same sent"
-                | _ -> failwith "Invalid branch"
+                    Expect.equal a (Some output)
+                        "Check Option value read from database is the same as the one sent"
+                | _ -> failwith "Invalid branch"                    
             }
 
             // Unhandled Exception: System.NotSupportedException: Npgsql 3.x removed support
@@ -260,7 +261,7 @@ let tests =
 
         testList "Sequential tests that update database state" [
 
-            test "Simple select and Sql.executeTable" {
+            test "Simple select and Sql.executeReader" {
                 let seedDatabase (connection: string) : unit =
                     connection
                     |> Sql.connect
@@ -279,7 +280,7 @@ let tests =
                     connection
                     |> Sql.connect
                     |> Sql.query "SELECT * FROM fsharp_test"
-                    |> Sql.executeTable
+                    |> Sql.executeReader (Sql.readRow >> Some)
                 Expect.equal
                     [
                         [("test_id", SqlValue.Int 1); ("test_name", SqlValue.String "first test")]
@@ -310,7 +311,7 @@ let tests =
                     |> Sql.connect
                     |> Sql.query "SELECT * FROM fsharp_test"
                     |> Sql.prepare
-                    |> Sql.executeTable
+                    |> Sql.executeReader (Sql.readRow >> Some)
                     |> Sql.mapEachRow (fun row ->
                         option {
                             let! id = Sql.readInt "test_id" row
@@ -449,7 +450,7 @@ let tests =
                     connection
                     |> Sql.connect
                     |> Sql.query "SELECT * FROM timestampz_test"
-                    |> Sql.executeTableSafe
+                    |> Sql.executeReaderSafe (Sql.readRow >> Some)
                 Expect.isError dataTable "Don't convert infinite timestampz value to DateTime"
             }
 
@@ -467,7 +468,7 @@ let tests =
                     connection
                     |> Sql.connect
                     |> Sql.query "SELECT date2 FROM timestampz_test"
-                    |> Sql.executeTableSafe
+                    |> Sql.executeReaderSafe (Sql.readRow >> Some)
                 Expect.isOk dataTable "Check query returns Ok Result"
                 match dataTable with
                 | Ok [[("date2", SqlValue.TimestampWithTimeZone d)]] ->
@@ -499,7 +500,7 @@ let tests =
                     connection
                     |> Sql.connect
                     |> Sql.query "SELECT * FROM timespan_test"
-                    |> Sql.executeTable
+                    |> Sql.executeReader (Sql.readRow >> Some)
                     |> Sql.parseEachRow<TimeSpanTest>
                 Expect.equal
                     [
@@ -516,7 +517,7 @@ let tests =
                     |> Sql.connect
                     |> Sql.query "SELECT * FROM timespan_test"
                     |> Sql.prepare
-                    |> Sql.executeTable
+                    |> Sql.executeReader (Sql.readRow >> Some)
                     |> Sql.mapEachRow (fun row ->
                         option {
                             let! id = Sql.readInt "id" row
@@ -561,7 +562,7 @@ let tests =
                     connection
                     |> Sql.connect
                     |> Sql.query "SELECT * FROM string_array_test"
-                    |> Sql.executeTable
+                    |> Sql.executeReader (Sql.readRow >> Some)
                     |> Sql.parseEachRow<StringArrayTest>
                 Expect.equal
                     [
@@ -578,7 +579,7 @@ let tests =
                     |> Sql.connect
                     |> Sql.query "SELECT * FROM string_array_test"
                     |> Sql.prepare
-                    |> Sql.executeTable
+                    |> Sql.executeReader (Sql.readRow >> Some)
                     |> Sql.mapEachRow (fun row ->
                         option {
                             let! id = Sql.readInt "id" row
@@ -620,7 +621,7 @@ let tests =
                     connection
                     |> Sql.connect
                     |> Sql.query "SELECT * FROM int_array_test"
-                    |> Sql.executeTable
+                    |> Sql.executeReader (Sql.readRow >> Some)
                     |> Sql.parseEachRow<IntArrayTest>
                 Expect.equal
                     [
@@ -637,7 +638,7 @@ let tests =
                     |> Sql.connect
                     |> Sql.query "SELECT * FROM int_array_test"
                     |> Sql.prepare
-                    |> Sql.executeTable
+                    |> Sql.executeReader (Sql.readRow >> Some)
                     |> Sql.mapEachRow (fun row ->
                         option {
                             let! id = Sql.readInt "id" row
