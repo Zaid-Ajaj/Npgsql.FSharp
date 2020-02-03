@@ -68,10 +68,13 @@ let buildInfinityDatabase() = buildDatabaseConnection true
 
 let tests =
     testList "Integration tests" [
-        testList "Query-only parallel tests without recreating database" [
+        testList "Query-only tests without recreating database" [
+
+            // `db` disposed at the end of the `testList`.
+            let db = buildDatabase()
+            let connection : string = db.ConnectionString
+
             test "Null roundtrip" {
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
                 let queryOutput : SqlValue =
                     connection
                     |> Sql.connect
@@ -82,8 +85,6 @@ let tests =
             }
 
             test "Reading time" {
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
                 let now : DateTime = DateTime.UtcNow
                 let databaseNow : DateTime =
                     connection
@@ -96,8 +97,6 @@ let tests =
             }
 
             test "Reading time with reader" {
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
                 let now : DateTime = DateTime.UtcNow
                 let databaseNowColl : list<DateTime> =
                     connection
@@ -111,8 +110,6 @@ let tests =
             }
 
             test "Jsonb roundtrip" {
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
                 let jsonData = "value from F#"
                 let inputJson = "{\"property\": \"" + jsonData + "\"}"
                 let jsonValue : SqlValue =
@@ -125,8 +122,6 @@ let tests =
             }
 
             testAsync "Reading time with reader async" {
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
                 let now : DateTime = DateTime.UtcNow
                 let! databaseNowColl =
                     connection
@@ -140,8 +135,6 @@ let tests =
             }
 
             testAsync "Reading time with reader safe async" {
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
                 let now : DateTime = DateTime.UtcNow
                 let! databaseNowColl =
                     connection
@@ -159,8 +152,6 @@ let tests =
             }
 
             test "Bytea roundtrip" {
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
                 let bytesInput : array<byte> = [1 .. 5] |> List.map byte |> Array.ofList
                 let dbBytes : SqlValue =
                     connection
@@ -172,8 +163,6 @@ let tests =
             }
 
             test "Uuid roundtrip" {
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
                 let guid : Guid = Guid.NewGuid()
                 let dbUuid : SqlValue =
                     connection
@@ -185,8 +174,6 @@ let tests =
             }
 
             test "Money roundtrip" {
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
                 let dbMoney : SqlValue =
                     connection
                     |> Sql.connect
@@ -197,8 +184,6 @@ let tests =
             }
 
             test "uuid_generate_v4()" {
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
                 let dbUuid : SqlValue =
                     connection
                     |> Sql.connect
@@ -210,8 +195,6 @@ let tests =
             }
 
             test "Local UTC time" {
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
                 let now : DateTime = DateTime.UtcNow
                 let nowTime : TimeSpan = now.TimeOfDay
                 let dbTime =
@@ -225,8 +208,6 @@ let tests =
             }
 
             test "String option roundtrip" {
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
                 let a : string option = Some "abc"
                 let b : string option = None
                 let table : SqlTable =
@@ -246,8 +227,6 @@ let tests =
             // for writing a parameter with an IEnumerable value, use .ToList()/.ToArray() instead.
             // Need to add a NpgsqlTypeHandler for Map ?
             test "HStore roundtrip" {
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
                 let inputMap : Map<string, string> = Map ["property", "value from F#"]
                 let value =
                     connection
@@ -257,7 +236,11 @@ let tests =
                     |> Sql.executeScalar
                 Expect.equal (SqlValue.HStore inputMap) value "Check hstore value read from database is the same sent"
             }
-        ]
+
+            test "Dispose database" {
+                (db :> IDisposable).Dispose()
+            }
+        ] |> testSequenced
 
         testList "Sequential tests that update database state" [
 
