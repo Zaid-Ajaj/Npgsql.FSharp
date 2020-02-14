@@ -1,6 +1,5 @@
 language: csharp
-dotnet: 3.0
-mono: none
+dotnet: 2.2
 services:
   - postgresql
 script:
