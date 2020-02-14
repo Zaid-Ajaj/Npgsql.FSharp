@@ -36,11 +36,18 @@ let buildDatabaseConnection handleInfinity : ThrowawayDatabase =
     let createExtensionHStore = "create extension if not exists hstore"
     let createExtensionUuid = "create extension if not exists \"uuid-ossp\""
 
+    // Travis CI uses an empty string for the password of the database
+    let databasePassword =
+        let runningTravis = Environment.GetEnvironmentVariable "TESTING_IN_TRAVISCI"
+        if isNull runningTravis || String.IsNullOrWhiteSpace runningTravis
+        then "postgres" // for local tests
+        else "" // for Travis CI
+
     let connection =
         Sql.host "localhost"
         |> Sql.port 5432
         |> Sql.username "postgres"
-        |> Sql.password "postgres"
+        |> Sql.password databasePassword
         |> Sql.convertInfinityDateTime handleInfinity
         |> Sql.str
 
