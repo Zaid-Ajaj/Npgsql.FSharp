@@ -102,7 +102,7 @@ let tests =
                 let databaseNowColl : list<DateTime> =
                     connection
                     |> Sql.connect
-                    |> Sql.query "SELECT NOW()::timestamp AS time"
+                    |> Sql.query "SELECT TIMEZONE('utc', NOW())::timestamp AS time"
                     |> Sql.executeReader (Sql.readRow >> Sql.readTimestamp "time")
                 let later : DateTime = now.AddMinutes(1.0)
                 Expect.equal 1 (List.length databaseNowColl) "Check list is a singleton"
@@ -112,11 +112,10 @@ let tests =
 
             test "Jsonb roundtrip" {
                 use db = buildDatabase()
-                let connection : string = db.ConnectionString
                 let jsonData = "value from F#"
                 let inputJson = "{\"property\": \"" + jsonData + "\"}"
                 let jsonValue : SqlValue =
-                    connection
+                    db.ConnectionString
                     |> Sql.connect
                     |> Sql.query "select @jsonb"
                     |> Sql.parameters ["jsonb", SqlValue.Jsonb inputJson]
@@ -126,12 +125,11 @@ let tests =
 
             testAsync "Reading time with reader async" {
                 use db = buildDatabase()
-                let connection : string = db.ConnectionString
                 let now : DateTime = DateTime.UtcNow
                 let! databaseNowColl =
-                    connection
+                    db.ConnectionString
                     |> Sql.connect
-                    |> Sql.query "SELECT NOW()::timestamp AS time"
+                    |> Sql.query "SELECT TIMEZONE('utc', NOW())::timestamp AS time"
                     |> Sql.executeReaderAsync (Sql.readRow >> Sql.readTimestamp "time")
                 let later : DateTime = now.AddMinutes(1.0)
                 Expect.equal 1 (List.length databaseNowColl) "Check list is a singleton"
@@ -141,12 +139,11 @@ let tests =
 
             testAsync "Reading time with reader safe async" {
                 use db = buildDatabase()
-                let connection : string = db.ConnectionString
                 let now : DateTime = DateTime.UtcNow
                 let! databaseNowColl =
-                    connection
+                    db.ConnectionString
                     |> Sql.connect
-                    |> Sql.query "SELECT NOW()::timestamp AS time"
+                    |> Sql.query "SELECT TIMEZONE('utc', NOW())::timestamp AS time"
                     |> Sql.executeReaderSafeAsync (Sql.readRow >> Sql.readTimestamp "time")
                 let later : DateTime = now.AddMinutes(1.0)
                 Expect.isOk databaseNowColl "Check Result value from database"
@@ -160,10 +157,9 @@ let tests =
 
             test "Bytea roundtrip" {
                 use db = buildDatabase()
-                let connection : string = db.ConnectionString
                 let bytesInput : array<byte> = [1 .. 5] |> List.map byte |> Array.ofList
                 let dbBytes : SqlValue =
-                    connection
+                    db.ConnectionString
                     |> Sql.connect
                     |> Sql.query "SELECT @manyBytes"
                     |> Sql.parameters [ "manyBytes", Sql.Value bytesInput ]
@@ -173,10 +169,9 @@ let tests =
 
             test "Uuid roundtrip" {
                 use db = buildDatabase()
-                let connection : string = db.ConnectionString
                 let guid : Guid = Guid.NewGuid()
                 let dbUuid : SqlValue =
-                    connection
+                    db.ConnectionString
                     |> Sql.connect
                     |> Sql.query "SELECT @uuid_input"
                     |> Sql.parameters [ "uuid_input", Sql.Value guid ]
@@ -186,9 +181,8 @@ let tests =
 
             test "Money roundtrip" {
                 use db = buildDatabase()
-                let connection : string = db.ConnectionString
                 let dbMoney : SqlValue =
-                    connection
+                    db.ConnectionString
                     |> Sql.connect
                     |> Sql.query "SELECT @money_input::money"
                     |> Sql.parameters [ "money_input", Sql.Value 12.5M ]
@@ -196,11 +190,21 @@ let tests =
                 Expect.equal (SqlValue.Decimal 12.5M) dbMoney "Check money as decimal read from database is the same sent"
             }
 
+            test "Money roundtrip with @ sign" {
+                use db = buildDatabase()
+                let dbMoney : SqlValue =
+                    db.ConnectionString
+                    |> Sql.connect
+                    |> Sql.query "SELECT @money_input::money"
+                    |> Sql.parameters [ "@money_input", Sql.Value 12.5M ]
+                    |> Sql.executeScalar
+                Expect.equal (SqlValue.Decimal 12.5M) dbMoney "Check money as decimal read from database is the same sent"
+            }
+
             test "uuid_generate_v4()" {
                 use db = buildDatabase()
-                let connection : string = db.ConnectionString
                 let dbUuid : SqlValue =
-                    connection
+                    db.ConnectionString
                     |> Sql.connect
                     |> Sql.query "SELECT uuid_generate_v4()"
                     |> Sql.executeScalar
@@ -209,37 +213,23 @@ let tests =
                 | _ -> failwith "Invalid branch"
             }
 
-            test "Local UTC time" {
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
-                let now : DateTime = DateTime.UtcNow
-                let nowTime : TimeSpan = now.TimeOfDay
-                let dbTime =
-                    connection
-                    |> Sql.connect
-                    |> Sql.query "SELECT localtime"
-                    |> Sql.executeScalar
-                    |> Sql.toTime
-                let later : TimeSpan = now.AddMinutes(1.0).TimeOfDay
-                Expect.isAscending [nowTime; dbTime; later] "Check database `localtime` function is accurate"
-            }
-
             test "String option roundtrip" {
                 use db = buildDatabase()
                 let connection : string = db.ConnectionString
                 let a : string option = Some "abc"
                 let b : string option = None
-                let table : SqlTable =
+                let table =
                     connection
                     |> Sql.connect
-                    |> Sql.query "SELECT @a, @b"
+                    |> Sql.query "SELECT @a as first, @b as second"
                     |> Sql.parameters [ "a", Sql.Value a; "b", Sql.Value b ]
                     |> Sql.executeReader (Sql.readRow >> Some)
+                    |> List.exactlyOne
                 match table with
-                | [[(_, SqlValue.String output); (_, SqlValue.Null)]] ->
-                    Expect.equal a (Some output)
-                        "Check Option value read from database is the same as the one sent"
-                | _ -> failwith "Invalid branch"                    
+                | [ ("first", SqlValue.String output); ("second", SqlValue.Null)] ->
+                    Expect.equal a (Some output) "Check Option value read from database is the same as the one sent"
+                | _ ->
+                    failwith "Invalid branch"
             }
 
             // Unhandled Exception: System.NotSupportedException: Npgsql 3.x removed support
