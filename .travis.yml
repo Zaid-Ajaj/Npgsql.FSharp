@@ -1,7 +1,12 @@
 language: csharp
-mono: 5.2.0
-dotnet: 2.0.0
+dotnet: 3.0.100
 dist: trusty
 sudo: true
+services:
+  - postgresql
 script:
-  - bash build.sh
+  - bash build.sh RunTests
+env:
+  global:
+    - PGUSERNAME=postgres
+    - PGPASSWORD=postgres
