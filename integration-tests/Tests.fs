@@ -82,7 +82,7 @@ let tests =
                 let queryOutput : SqlValue =
                     connection
                     |> Sql.connect
-                    |> Sql.query "SELECT @nullValue"
+                    |> Sql.query "SELECT @nullValue::text"
                     |> Sql.parameters [ "nullValue", SqlValue.Null ]
                     |> Sql.executeScalar
                 Expect.equal SqlValue.Null queryOutput "Check null value returned from database is the same sent"
@@ -228,7 +228,7 @@ let tests =
                 let table =
                     connection
                     |> Sql.connect
-                    |> Sql.query "SELECT @a as first, @b as second"
+                    |> Sql.query "SELECT @a::text as first, @b::text as second"
                     |> Sql.parameters [ "a", Sql.Value a; "b", Sql.Value b ]
                     |> Sql.executeReader (Sql.readRow >> Some)
                     |> List.exactlyOne
