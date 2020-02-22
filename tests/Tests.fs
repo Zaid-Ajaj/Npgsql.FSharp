@@ -61,6 +61,7 @@ let buildDatabaseConnection handleInfinity : ThrowawayDatabase =
         createTimestampzTable, [ ]
         createTimespanTable, [ ]
         createStringArrayTable, [ ]
+        createExtensionHStore, [ ]
         createIntArrayTable, [ ]
         createExtensionUuid, [ ]
     ]
@@ -75,7 +76,7 @@ let tests =
     testList "Integration tests" [
         testList "RowReader tests used in Sql.read and Sql.readAsync" [
             test "Sql.read works" {
-                let db = buildDatabase()
+                use db = buildDatabase()
                 Sql.connect db.ConnectionString
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
                 |> Sql.executeNonQuery
@@ -195,27 +196,11 @@ let tests =
                 | _ ->
                     failwith "Invalid branch"
             }
-
-            // Unhandled Exception: System.NotSupportedException: Npgsql 3.x removed support
-            // for writing a parameter with an IEnumerable value, use .ToList()/.ToArray() instead.
-            // Need to add a NpgsqlTypeHandler for Map ?
-            //test "HStore roundtrip" {
-            //    use db = buildDatabase()
-            //    let connection : string = db.ConnectionString
-            //    let inputMap : Map<string, string> = Map ["property", "value from F#"]
-            //    let value =
-            //        connection
-            //        |> Sql.connect
-            //        |> Sql.query "select @map"
-            //        |> Sql.parameters ["map", Sql.Value inputMap]
-            //        |> Sql.executeScalar
-            //    Expect.equal (SqlValue.HStore inputMap) value "Check hstore value read from database is the same sent"
-            //}
         ]
 
         testList "Sequential tests that update database state" [
 
-            test "Sql.execute" {
+            ftest "Sql.execute" {
                 let seedDatabase (connection: string) =
                     connection
                     |> Sql.connect
@@ -269,7 +254,7 @@ let tests =
                     connection
                     |> Sql.connect
                     |> Sql.query "SELECT data ->> 'property' as property FROM data_with_jsonb"
-                    |> Sql.executeScalarString
+                    |> Sql.executeSingleRow (fun read -> read.text "property")
 
                 match dbJson with
                 | Error error -> raise error

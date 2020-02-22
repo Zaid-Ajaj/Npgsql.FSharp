@@ -80,19 +80,21 @@ type SslMode =
 
 type RowReader(reader: NpgsqlDataReader) =
     let columnDict = Dictionary<string, int>()
+    let columnTypes = Dictionary<string, string>()
     do
         // Populate the names of the columns into a dictionary
         // such that each read doesn't need to loop through all columns
         for fieldIndex in [0 .. reader.FieldCount - 1] do
             columnDict.Add(reader.GetName(fieldIndex), fieldIndex)
+            columnTypes.Add(reader.GetName(fieldIndex), reader.GetDataTypeName(fieldIndex))
 
     let failToRead (column: string) (columnType: string) =
         let availableColumns =
             columnDict.Keys
-            |> Seq.map (sprintf "'%s'")
+            |> Seq.map (fun key -> sprintf "[%s:%s]" key columnTypes.[key])
             |> String.concat ", "
-        failwithf "Could not read column '%s' as %s. Available columns are %s"  column columnType availableColumns
 
+        failwithf "Could not read column '%s' as %s. Available columns are %s"  column columnType availableColumns
     with
 
     member this.int(column: string) : int =
@@ -636,5 +638,3 @@ module Sql =
             else Ok (read (RowReader(reader)))
         with
         | ex -> Error ex
-
-    let executeScalarString = executeSingleRow (fun read -> read.NpgsqlReader.GetString(0))
