@@ -12,8 +12,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <LangVersion>latest</LangVersion>
     <PackageReleaseNotes>
-      Adds optional variants to Sql.Value by @njlr
-      Add deprecation notice for Sql.executeTable
+      Library rewrite
     </PackageReleaseNotes>
   </PropertyGroup>
   <ItemGroup>
