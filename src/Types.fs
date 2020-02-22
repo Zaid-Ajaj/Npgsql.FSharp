@@ -10,11 +10,11 @@ type SqlValue =
     | Long of int64
     | String of string
     | Date of DateTime
+    | Bit of bool
     | Bool of bool
     | Number of double
     | Decimal of decimal
     | Bytea of byte[]
-    | HStore of Map<string, string>
     | Uuid of Guid
     | Timestamp of DateTime
     | TimestampWithTimeZone of DateTime
