@@ -3,6 +3,6 @@ dotnet: 3.0
 services:
   - postgresql
 script:
-  - bash build.sh RunTests
+  - bash build.sh Test
 env:
   - TESTING_IN_TRAVISCI=true
