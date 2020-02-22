@@ -273,10 +273,32 @@ type RowReader(reader: NpgsqlDataReader) =
         | true, columnIndex -> reader.GetDate(columnIndex)
         | false, _ -> failToRead column "date"
 
+    /// Gets the value of the specified column as an `NpgsqlTypes.NpgsqlDate`, Npgsql's provider-specific type for dates.
+    ///
+    /// PostgreSQL's date type represents dates from 4713 BC to 5874897 AD, while .NET's `DateTime` only supports years from 1 to 1999. If you require years outside this range use this accessor.
+    ///
+    /// See http://www.postgresql.org/docs/current/static/datatype-datetime.html to learn more
+    member this.dateOrNull(column: string) : NpgsqlTypes.NpgsqlDate option =
+        match columnDict.TryGetValue(column) with
+        | true, columnIndex ->
+            if reader.IsDBNull (columnIndex)
+            then None
+            else Some (reader.GetDate(columnIndex))
+        | false, _ -> failToRead column "date"
+
     /// Gets the value of the specified column as a System.DateTime object.
     member this.dateTime(column: string) : DateTime =
         match columnDict.TryGetValue(column) with
         | true, columnIndex -> reader.GetDateTime(columnIndex)
+        | false, _ -> failToRead column "datetime"
+
+    /// Gets the value of the specified column as a System.DateTime object.
+    member this.dateTimeOrNull(column: string) : DateTime option =
+        match columnDict.TryGetValue(column) with
+        | true, columnIndex ->
+            if reader.IsDBNull(columnIndex)
+            then None
+            else Some (reader.GetDateTime(columnIndex))
         | false, _ -> failToRead column "datetime"
 
     /// Gets the value of the specified column as an `NpgsqlTypes.NpgsqlTimeSpan`, Npgsql's provider-specific type for time spans.
