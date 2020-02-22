@@ -76,7 +76,7 @@ type User = {
     LastName: string option
 }
 
-let getAllUsers() : Result<User list> =
+let getAllUsers() : Result<User list, exn> =
     defaultConnection
     |> Sql.connectFromConfig
     |> Sql.query "SELECT * FROM users"
@@ -101,7 +101,7 @@ let getAllUsers() : Async<Result<User list, exn>> =
 
 ### Parameterized queries
 ```fs
-let getAllUsers() : Async<Result<User list>> =
+let getAllUsers() : Async<Result<User list, exn>> =
     defaultConnection
     |> Sql.connectFromConfig
     |> Sql.query "SELECT * FROM users WHERE is_active = @active"
