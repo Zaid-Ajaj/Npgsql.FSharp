@@ -1,6 +1,8 @@
 # Npgsql.FSharp [![Nuget](https://img.shields.io/nuget/v/Npgsql.FSharp.svg?colorB=green)](https://www.nuget.org/packages/Npgsql.FSharp) [![Build Status](https://travis-ci.com/Zaid-Ajaj/Npgsql.FSharp.svg?branch=master)](https://travis-ci.com/Zaid-Ajaj/Npgsql.FSharp)
 
-Thin F# wrapper for [Npgsql](https://github.com/npgsql/npgsql), data provider for PostgreSQL.
+Thin F#-friendly layer for the [Npgsql](https://github.com/npgsql/npgsql) data provider for PostgreSQL.
+
+For an optimal developer experience, this library can be used with [Npgsql.FSharp.Analyzer](https://github.com/Zaid-Ajaj/Npgsql.FSharp.Analyzer) which is a F# analyzer that will verify the query syntax and perform type-checking againt the database schema.
 
 This wrapper maps *raw* SQL data from the database into the `Sql` data structure making it easy to pattern match against and transform the results.
 
@@ -43,7 +45,7 @@ The function `Sql.connect` takes a connection string as input, for example if yo
 
 However, `Sql.connectFromConfig` takes the connection string *builder* if you are configuring the connection string from code.
 
-`Sql.connectFromConfig` will internally call `Sql.connect (Sql.formatConnectionString inputConfig)`
+`Sql.connectFromConfig inputConfig` is just `Sql.connect (Sql.formatConnectionString inputConfig)`
 
 ### Execute query and read results as table then map the results
 ```fs
@@ -109,6 +111,16 @@ let getAllUsers() : Async<Result<User list>> =
         FirstName = read.text "first_name"
         LastName = read.textOrNull "last_name"
     })
+```
+
+### Execute scalar values with `Sql.executeSingleRow`
+```fs
+let activeUsers() : Async<Result<int, exn>> =
+    defaultConnection
+    |> Sql.connectFromConfig
+    |> Sql.query "SELECT COUNT(*) as count FROM users WHERE is_active = @active"
+    |> Sql.parameters [ "active", Sql.bit true ]
+    |> Sql.executeSingleRow (fun read -> read.int "count")
 ```
 
 ### Execute multiple inserts or updates in a single transaction:
