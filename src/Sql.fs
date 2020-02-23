@@ -44,6 +44,8 @@ type Sql() =
     static member decimalOrNull(value: decimal option) = Utils.sqlMap value Sql.decimal
     static member money(value: decimal) = SqlValue.Decimal value
     static member moneyOrNull(value: decimal option) = Sql.decimalOrNull value
+    static member int8(value: int8) = SqlValue.TinyInt value
+    static member int8OrNull(value: int8 option) = Utils.sqlMap value Sql.int8
     static member int16(value: int16) = SqlValue.Short value
     static member int16OrNull(value: int16 option) = Utils.sqlMap value Sql.int16
     static member int64(value: int64) = SqlValue.Long value
@@ -356,7 +358,7 @@ module Sql =
     type SqlProps = private {
         ConnectionString : string
         SqlQuery : string list
-        Parameters : SqlRow
+        Parameters : (string * SqlValue) list
         IsFunction : bool
         NeedPrepare : bool
         CancellationToken: CancellationToken
@@ -386,7 +388,7 @@ module Sql =
     }
 
     let connect constr  = { defaultProps() with ConnectionString = constr }
-    let withCert cert props = { props with ClientCertificate = Some cert }
+    let clientCertificate cert props = { props with ClientCertificate = Some cert }
     let host x = { defaultConString() with Host = x }
     let username username config = { config with Username = Some username }
     /// Specifies the password of the user that is logging in into the database server
@@ -471,7 +473,7 @@ module Sql =
     let func (sql: string) props = { props with SqlQuery = [sql]; IsFunction = true }
     let prepare  props = { props with NeedPrepare = true}
     let parameters ls props = { props with Parameters = ls }
-    let newConnection (props: SqlProps): NpgsqlConnection =
+    let private newConnection (props: SqlProps): NpgsqlConnection =
         let connection = new NpgsqlConnection(props.ConnectionString)
         match props.ClientCertificate with
         | Some cert ->
@@ -480,7 +482,7 @@ module Sql =
         | None -> ()
         connection
 
-    let private populateRow (cmd: NpgsqlCommand) (row: SqlRow) =
+    let private populateRow (cmd: NpgsqlCommand) (row: (string * SqlValue) list) =
         for (paramName, value) in row do
           let paramValue, paramType : (obj * NpgsqlTypes.NpgsqlDbType option) =
             match value with
@@ -499,6 +501,7 @@ module Sql =
             | SqlValue.Bytea x -> upcast x, Some NpgsqlTypes.NpgsqlDbType.Bytea
             | SqlValue.TimeWithTimeZone x -> upcast x, Some NpgsqlTypes.NpgsqlDbType.TimeTz
             | SqlValue.Null -> upcast DBNull.Value, None
+            | SqlValue.TinyInt x -> upcast x, None
             | SqlValue.Jsonb x -> upcast x, Some NpgsqlTypes.NpgsqlDbType.Jsonb
             | SqlValue.Time x -> upcast x, Some NpgsqlTypes.NpgsqlDbType.Time
             | SqlValue.StringArray x -> upcast x, Some (NpgsqlTypes.NpgsqlDbType.Array ||| NpgsqlTypes.NpgsqlDbType.Text )
@@ -645,18 +648,3 @@ module Sql =
             with
             | error -> return Error error
         }
-
-    let executeSingleRow (read: RowReader -> 't) (props: SqlProps) : Result<'t, exn> =
-        try
-            if List.isEmpty props.SqlQuery then failwith "No query provided to execute. Please use Sql.query to provide it"
-            use connection = newConnection props
-            connection.Open()
-            use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
-            do populateCmd command props
-            if props.NeedPrepare then command.Prepare()
-            let reader = command.ExecuteReader()
-            if not (reader.Read())
-            then failwith "Could not read a single scalar value: the reader returned 0 rows"
-            else Ok (read (RowReader(reader)))
-        with
-        | ex -> Error ex

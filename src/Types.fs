@@ -5,6 +5,7 @@ open System
 [<RequireQualifiedAccess>]
 type SqlValue =
     | Null
+    | TinyInt of int8
     | Short of int16
     | Int of int
     | Long of int64
@@ -23,7 +24,3 @@ type SqlValue =
     | Jsonb of string
     | StringArray of string array
     | IntArray of int array
-
-type SqlRow = list<string * SqlValue>
-
-type SqlTable = list<SqlRow>

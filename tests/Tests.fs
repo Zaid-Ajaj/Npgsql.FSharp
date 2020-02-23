@@ -121,10 +121,10 @@ let tests =
                 |> Sql.connect
                 |> Sql.query "SELECT @nullValue::text as output"
                 |> Sql.parameters [ "nullValue", Sql.dbnull ]
-                |> Sql.executeSingleRow (fun read -> read.textOrNull "output")
+                |> Sql.execute (fun read -> read.textOrNull "output")
                 |> function
                     | Error error -> raise error
-                    | Ok output -> Expect.isNone output "Output was null"
+                    | Ok output -> Expect.isNone output.[0] "Output was null"
             }
 
             test "Bytea roundtrip" {
@@ -134,10 +134,10 @@ let tests =
                 |> Sql.connect
                 |> Sql.query "SELECT @manyBytes as output"
                 |> Sql.parameters [ "manyBytes", Sql.bytea input ]
-                |> Sql.executeSingleRow (fun read -> read.bytea "output")
+                |> Sql.execute (fun read -> read.bytea "output")
                 |> function
                     | Error error -> raise error
-                    | Ok output -> Expect.equal input output "Check bytes read from database are the same sent"
+                    | Ok output -> Expect.equal input output.[0] "Check bytes read from database are the same sent"
             }
 
             test "Uuid roundtrip" {
@@ -147,10 +147,10 @@ let tests =
                 |> Sql.connect
                 |> Sql.query "SELECT @uuid_input as output"
                 |> Sql.parameters [ "uuid_input", Sql.uuid id ]
-                |> Sql.executeSingleRow (fun read -> read.uuid "output")
+                |> Sql.execute (fun read -> read.uuid "output")
                 |> function
                     | Error error -> raise error
-                    | Ok output -> Expect.equal id output "Check uuid read from database is the same sent"
+                    | Ok output -> Expect.equal id output.[0] "Check uuid read from database is the same sent"
             }
 
             test "Money roundtrip with @ sign" {
@@ -159,10 +159,10 @@ let tests =
                 |> Sql.connect
                 |> Sql.query "SELECT @money_input::money as value"
                 |> Sql.parameters [ "@money_input", Sql.money 12.5M ]
-                |> Sql.executeSingleRow (fun read -> read.decimal "value")
+                |> Sql.execute (fun read -> read.decimal "value")
                 |> function
                     | Error error -> raise error
-                    | Ok money -> Expect.equal money 12.5M "Check money as decimal read from database is the same sent"
+                    | Ok money -> Expect.equal money.[0] 12.5M "Check money as decimal read from database is the same sent"
             }
 
             test "uuid_generate_v4()" {
@@ -170,10 +170,11 @@ let tests =
                 db.ConnectionString
                 |> Sql.connect
                 |> Sql.query "SELECT uuid_generate_v4() as id"
-                |> Sql.executeSingleRow (fun read -> read.uuid "id")
+                |> Sql.execute (fun read -> read.uuid "id")
                 |> function
                     | Error error -> raise error
-                    | Ok uuid ->  Expect.isNotNull (uuid.ToString()) "Check database generates an UUID"
+                    | Ok [ uuid ] ->  Expect.isNotNull (uuid.ToString()) "Check database generates an UUID"
+                    | Ok _ -> failwith "Should not happpen"
             }
 
             test "String option roundtrip" {
@@ -181,26 +182,26 @@ let tests =
                 let connection : string = db.ConnectionString
                 let a : string option = Some "abc"
                 let b : string option = None
-                let table =
+                let row =
                     connection
                     |> Sql.connect
                     |> Sql.query "SELECT @a::text as first, @b::text as second"
                     |> Sql.parameters [ "a", Sql.textOrNull a; "b", Sql.textOrNull b ]
-                    |> Sql.executeSingleRow (fun read -> read.textOrNull "first", read.textOrNull "second")
+                    |> Sql.execute (fun read -> read.textOrNull "first", read.textOrNull "second")
 
-                match table with
-                | Ok (Some output, None) ->
+                match row with
+                | Ok [ (Some output, None) ] ->
                     Expect.equal a (Some output) "Check Option value read from database is the same as the one sent"
+                | Ok (_) ->
+                    failwith "Unexpected results"
                 | Error error ->
                     raise error
-                | _ ->
-                    failwith "Invalid branch"
             }
         ]
 
         testList "Sequential tests that update database state" [
 
-            ftest "Sql.execute" {
+            test "Sql.execute" {
                 let seedDatabase (connection: string) =
                     connection
                     |> Sql.connect
@@ -254,11 +255,11 @@ let tests =
                     connection
                     |> Sql.connect
                     |> Sql.query "SELECT data ->> 'property' as property FROM data_with_jsonb"
-                    |> Sql.executeSingleRow (fun read -> read.text "property")
+                    |> Sql.execute(fun read -> read.text "property")
 
                 match dbJson with
                 | Error error -> raise error
-                | Ok json -> Expect.equal json jsonData "Check json read from database"
+                | Ok json -> Expect.equal json.[0] jsonData "Check json read from database"
             }
 
             test "Infinity time" {
@@ -276,7 +277,7 @@ let tests =
                     connection
                     |> Sql.connect
                     |> Sql.query "SELECT * FROM timestampz_test"
-                    |> Sql.executeSingleRow (fun read -> read.timestamptz "date2")
+                    |> Sql.execute (fun read -> read.timestamptz "date2")
 
                 Expect.isOk dataTable "Should be able to get results"
             }

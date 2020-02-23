@@ -69,6 +69,7 @@ let getAllUsers() : Result<User list, exn> =
     })
 ```
 ### Deal with null values and provide defaults
+Notice the `LastName` field becomes `string option` instead of `string`
 ```fs
 type User = {
     Id: int
@@ -80,11 +81,12 @@ let getAllUsers() : Result<User list, exn> =
     defaultConnection
     |> Sql.connectFromConfig
     |> Sql.query "SELECT * FROM users"
-    |> Sql.execute (fun read -> {
-        Id = read.int "user_id"
-        FirstName = read.text "first_name"
-        LastName = read.textOrNull "last_name"
-    })
+    |> Sql.execute (fun read ->
+        {
+            Id = read.int "user_id"
+            FirstName = read.text "first_name"
+            LastName = read.textOrNull "last_name"
+        })
 ```
 ### Make the reading async using `Sql.executeAsync`
 ```fsharp
@@ -92,11 +94,12 @@ let getAllUsers() : Async<Result<User list, exn>> =
     defaultConnection
     |> Sql.connectFromConfig
     |> Sql.query "SELECT * FROM users"
-    |> Sql.executeAsync (fun read -> {
-        Id = read.int "user_id"
-        FirstName = read.text "first_name"
-        LastName = read.textOrNull "last_name"
-    })
+    |> Sql.executeAsync (fun read ->
+        {
+            Id = read.int "user_id"
+            FirstName = read.text "first_name"
+            LastName = read.textOrNull "last_name"
+        })
 ```
 
 ### Parameterized queries
@@ -106,21 +109,32 @@ let getAllUsers() : Async<Result<User list, exn>> =
     |> Sql.connectFromConfig
     |> Sql.query "SELECT * FROM users WHERE is_active = @active"
     |> Sql.parameters [ "active", Sql.bit true ]
-    |> Sql.executeAsync (fun read -> {
-        Id = read.int "user_id"
-        FirstName = read.text "first_name"
-        LastName = read.textOrNull "last_name"
-    })
+    |> Sql.executeAsync (fun read ->
+        {
+            Id = read.int "user_id"
+            FirstName = read.text "first_name"
+            LastName = read.textOrNull "last_name"
+        })
 ```
 
-### Execute scalar values with `Sql.executeSingleRow`
+### Retrieve single rows with `Sql.executeSingleRow`
 ```fs
-let activeUsers() : Async<Result<int, exn>> =
+let findUser(username: string) : SingleRow<User> =
     defaultConnection
     |> Sql.connectFromConfig
-    |> Sql.query "SELECT COUNT(*) as count FROM users WHERE is_active = @active"
-    |> Sql.parameters [ "active", Sql.bit true ]
-    |> Sql.executeSingleRow (fun read -> read.int "count")
+    |> Sql.query "SELECT * FROM users WHERE username = @username LIMIT 1"
+    |> Sql.parameters [ "username", Sql.text username ]
+    |> Sql.executeSingleRow (fun read ->
+        {
+            Id = read.int "user_id"
+            FirstName = read.text "first_name"
+            LastName = read.textOrNull "last_name"
+        })
+
+match findUser "me" with
+| SingleRow.Found user -> printnf "Found %s" user.FirstName
+| SingleRow.NotFound -> printfn "Couldn't find the user"
+| SingleRow.FailedToExecute error -> printfn "Something went wrong %A"
 ```
 
 ### Execute multiple inserts or updates in a single transaction:
@@ -130,13 +144,13 @@ connectionString
 |> Sql.executeTransaction // SqlProps -> int list
     [
         "INSERT INTO ... VALUES (@number)", [
-            [ "@number", SqlValue.Int 1 ]
-            [ "@number", SqlValue.Int 2 ]
-            [ "@number", SqlValue.Int 3 ]
+            [ "@number", Sql.int 1 ]
+            [ "@number", Sql.int 2 ]
+            [ "@number", Sql.int 3 ]
         ]
 
         "UPDATE ... SET meta = @meta",  [
-           [ "@meta", SqlValue.String value ]
+           [ "@meta", Sql.text value ]
         ]
    ]
 ```
