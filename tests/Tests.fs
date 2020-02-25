@@ -75,7 +75,7 @@ let buildInfinityDatabase() = buildDatabaseConnection true
 let tests =
     testList "Integration tests" [
         testList "RowReader tests used in Sql.read and Sql.readAsync" [
-            test "Sql.read works" {
+            test "Sql.executeTransaction works" {
                 use db = buildDatabase()
                 Sql.connect db.ConnectionString
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
@@ -111,6 +111,31 @@ let tests =
                 | Error err -> raise err
                 | Ok users -> Expect.equal users expected "Users can be read correctly"
             }
+
+            test "Sql.executeNonQuery works" {
+                use db = buildDatabase()
+                Sql.connect db.ConnectionString
+                |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
+                |> Sql.executeNonQuery
+                |> ignore
+
+                Sql.connect db.ConnectionString
+                |> Sql.executeTransaction [
+                    "INSERT INTO users (username, active, salary) VALUES (@username, @active, @salary)", [
+                        [ ("@username", Sql.text "first"); ("active", Sql.bit true); ("salary", Sql.money 1.0M)  ]
+                        [ ("@username", Sql.text "second"); ("active", Sql.bit false); ("salary", Sql.money 1.0M) ]
+                        [ ("@username", Sql.text "third"); ("active", Sql.bit true);("salary", Sql.money 1.0M) ]
+                    ]
+                ]
+                |> ignore
+
+                Sql.connect db.ConnectionString
+                |> Sql.query "DELETE FROM users"
+                |> Sql.executeNonQuery
+                |> function
+                    | Error error -> raise error
+                    | Ok rowsAffected -> Expect.equal 3 rowsAffected "Three entries are deleted"
+            }
         ]
 
         testList "Query-only parallel tests without recreating database" [
@@ -138,6 +163,18 @@ let tests =
                 |> function
                     | Error error -> raise error
                     | Ok output -> Expect.equal input output.[0] "Check bytes read from database are the same sent"
+            }
+
+            test "bit/bool roundtrip" {
+                use db = buildDatabase()
+                db.ConnectionString
+                |> Sql.connect
+                |> Sql.query "SELECT @logical as output"
+                |> Sql.parameters [ "logical", Sql.bit true ]
+                |> Sql.execute (fun read -> read.bool "output")
+                |> function
+                    | Error error -> raise error
+                    | Ok output -> Expect.equal true output.[0] "Check bytes read from database are the same sent"
             }
 
             test "Uuid roundtrip" {
@@ -301,64 +338,6 @@ let tests =
             //    match dataTable with
             //    | Error error -> raise error
             //    | Ok timestamp -> Expect.isTrue timestamp.IsInfinity "Returned timestamp is infinity"
-            //}
-
-            //test "Handle TimeSpan" {
-            //    let t1 = TimeSpan(13, 45, 23)
-            //    let t2 = TimeSpan(16, 17, 09)
-            //    let t3 = TimeSpan(20, 02, 56)
-            //    let seedDatabase (connection: string) =
-            //        connection
-            //        |> Sql.connect
-            //        |> Sql.executeTransaction [
-            //            "INSERT INTO timespan_test (id, at) values (@id, @at)", [
-            //                [ "@id", Sql.Value 1; "@at", Sql.Value t1 ]
-            //                [ "@id", Sql.Value 2; "@at", Sql.Value t2 ]
-            //                [ "@id", Sql.Value 3; "@at", Sql.Value t3 ]
-            //            ]
-            //        ]
-            //        |> ignore
-            //    use db = buildDatabase()
-            //    let connection : string = db.ConnectionString
-            //    seedDatabase connection
-//
-            //    // Use `parseEachRow<T>`
-            //    let table : list<TimeSpanTest> =
-            //        connection
-            //        |> Sql.connect
-            //        |> Sql.query "SELECT * FROM timespan_test"
-            //        |> Sql.executeReader (Sql.readRow >> Some)
-            //        |> Sql.parseEachRow<TimeSpanTest>
-            //    Expect.equal
-            //        [
-            //            { id = 1; at = t1 }
-            //            { id = 2; at = t2 }
-            //            { id = 3; at = t3 }
-            //        ]
-            //        table
-            //        "All rows from `timespan_test` table using `parseEachRow`"
-//
-            //    // Use `mapEachRow` + `readTime`
-            //    let table =
-            //        connection
-            //        |> Sql.connect
-            //        |> Sql.query "SELECT * FROM timespan_test"
-            //        |> Sql.prepare
-            //        |> Sql.executeReader (Sql.readRow >> Some)
-            //        |> Sql.mapEachRow (fun row ->
-            //            option {
-            //                let! id = Sql.readInt "id" row
-            //                let! at = Sql.readTime "at" row
-            //                return { id = id; at = at }
-            //            })
-            //    Expect.equal
-            //        [
-            //            { id = 1; at = TimeSpan(13, 45, 23) }
-            //            { id = 2; at = TimeSpan(16, 17, 09) }
-            //            { id = 3; at = TimeSpan(20, 02, 56) }
-            //        ]
-            //        table
-            //        "All rows from `timespan_test` table using `mapEachRow`"
             //}
 
             test "Handle String Array" {
