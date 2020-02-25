@@ -5,12 +5,10 @@ open System.IO
 open Fake
 
 let libPath = "./src"
-let testsPath = "./integration-tests"
+let testsPath = "./tests"
 let databaseDockerContainerName = "npgsql_fsharp_db"
 let databaseDockerImageName = "postgres"
 let databasePassword = "postgres"
-
-
 
 let platformTool tool winTool =
   let tool = if isUnix then tool else winTool
@@ -130,12 +128,12 @@ Target "PublishNuget" (publish libPath)
 
 Target "Build" <| fun _ -> run "dotnet" "build" libPath
 
-Target "RunTests" <| fun _ ->
+Target "Test" <| fun _ ->
     run "dotnet" "run" testsPath
 
 "Clean"
  ==> "RestoreTestProject"
- ==> "RunTests"
+ ==> "Test"
 
 "Clean"
  ==> "RestoreLibProject"
