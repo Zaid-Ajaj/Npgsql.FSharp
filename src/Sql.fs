@@ -3,20 +3,11 @@ namespace Npgsql.FSharp
 open System
 open Npgsql
 open System.Threading
-open System.Threading.Tasks
 open System.Data
 open System.Collections.Generic
-open FSharp.Control.Tasks
-
-open System.Reflection
-open Microsoft.FSharp.Reflection
 open System.Security.Cryptography.X509Certificates
 
 module internal Utils =
-    let isOption (p:PropertyInfo) =
-        p.PropertyType.IsGenericType &&
-        p.PropertyType.GetGenericTypeDefinition() = typedefof<Option<_>>
-
     let sqlMap (option: 'a option) (f: 'a -> SqlValue) : SqlValue =
         Option.defaultValue SqlValue.Null (Option.map f option)
 
@@ -29,39 +20,39 @@ module Async =
 
 type Sql() =
     static member int(value: int) = SqlValue.Int value
-    static member intOrNull(value: int option) = Utils.sqlMap value Sql.int
+    static member intOrNone(value: int option) = Utils.sqlMap value Sql.int
     static member string(value: string) = SqlValue.String (if isNull value then String.Empty else value)
-    static member stringOrNull(value: string option) = Utils.sqlMap value Sql.string
+    static member stringOrNone(value: string option) = Utils.sqlMap value Sql.string
     static member text(value: string) = SqlValue.String value
-    static member textOrNull(value: string option) = Sql.stringOrNull value
+    static member textOrNone(value: string option) = Sql.stringOrNone value
     static member bit(value: bool) = SqlValue.Bit value
-    static member bitOrNull(value: bool option) = Utils.sqlMap value Sql.bit
+    static member bitOrNone(value: bool option) = Utils.sqlMap value Sql.bit
     static member bool(value: bool) = SqlValue.Bool value
-    static member boolOrNull(value: bool option) = Utils.sqlMap value Sql.bool
+    static member boolOrNone(value: bool option) = Utils.sqlMap value Sql.bool
     static member double(value: double) = SqlValue.Number value
-    static member doubleOrNull(value: double option) = Utils.sqlMap value Sql.double
+    static member doubleOrNone(value: double option) = Utils.sqlMap value Sql.double
     static member decimal(value: decimal) = SqlValue.Decimal value
-    static member decimalOrNull(value: decimal option) = Utils.sqlMap value Sql.decimal
+    static member decimalOrNone(value: decimal option) = Utils.sqlMap value Sql.decimal
     static member money(value: decimal) = SqlValue.Decimal value
-    static member moneyOrNull(value: decimal option) = Sql.decimalOrNull value
+    static member moneyOrNone(value: decimal option) = Sql.decimalOrNone value
     static member int8(value: int8) = SqlValue.TinyInt value
-    static member int8OrNull(value: int8 option) = Utils.sqlMap value Sql.int8
+    static member int8OrNone(value: int8 option) = Utils.sqlMap value Sql.int8
     static member int16(value: int16) = SqlValue.Short value
-    static member int16OrNull(value: int16 option) = Utils.sqlMap value Sql.int16
+    static member int16OrNone(value: int16 option) = Utils.sqlMap value Sql.int16
     static member int64(value: int64) = SqlValue.Long value
-    static member int64OrNull(value: int64 option) = Utils.sqlMap value Sql.int64
+    static member int64OrNone(value: int64 option) = Utils.sqlMap value Sql.int64
     static member timestamp(value: DateTime) = SqlValue.Timestamp value
-    static member timestampOrNull(value: DateTime option) = Utils.sqlMap value Sql.timestamp
+    static member timestampOrNone(value: DateTime option) = Utils.sqlMap value Sql.timestamp
     static member timestamptz(value: DateTime) = SqlValue.TimestampWithTimeZone value
-    static member timestamptzOrNull(value: DateTime option) = Utils.sqlMap value Sql.timestamptz
+    static member timestamptzOrNone(value: DateTime option) = Utils.sqlMap value Sql.timestamptz
     static member uuid(value: Guid) = SqlValue.Uuid value
-    static member uuidOrNull(value: Guid option) = Utils.sqlMap value Sql.uuid
+    static member uuidOrNone(value: Guid option) = Utils.sqlMap value Sql.uuid
     static member bytea(value: byte[]) = SqlValue.Bytea value
-    static member byteaOrNull(value: byte[] option) = Utils.sqlMap value Sql.bytea
+    static member byteaOrNone(value: byte[] option) = Utils.sqlMap value Sql.bytea
     static member stringArray(value: string[]) = SqlValue.StringArray value
-    static member stringArrayOrNull(value: string[] option) = Utils.sqlMap value Sql.stringArray
+    static member stringArrayOrNone(value: string[] option) = Utils.sqlMap value Sql.stringArray
     static member intArray(value: int[]) = SqlValue.IntArray value
-    static member intArrayOrNull(value: int[] option) = Utils.sqlMap value Sql.intArray
+    static member intArrayOrNone(value: int[] option) = Utils.sqlMap value Sql.intArray
     static member dbnull = SqlValue.Null
 
 /// Specifies how to manage SSL.
@@ -104,7 +95,7 @@ type RowReader(reader: NpgsqlDataReader) =
         | true, columnIndex -> reader.GetInt32(columnIndex)
         | false, _ -> failToRead column "int"
 
-    member this.intOrNull(column: string) : int option =
+    member this.intOrNone(column: string) : int option =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
             if reader.IsDBNull(columnIndex)
@@ -120,7 +111,7 @@ type RowReader(reader: NpgsqlDataReader) =
         | true, columnIndex -> reader.GetInt16(columnIndex)
         | false, _ -> failToRead column "int16"
 
-    member this.int16OrNull(column: string) : int16 option =
+    member this.int16OrNone(column: string) : int16 option =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
             if reader.IsDBNull(columnIndex)
@@ -133,7 +124,7 @@ type RowReader(reader: NpgsqlDataReader) =
         | true, columnIndex -> reader.GetFieldValue<int[]>(columnIndex)
         | false, _ -> failToRead column "int[]"
 
-    member this.intArrayOrNull(column: string) : int[] option =
+    member this.intArrayOrNone(column: string) : int[] option =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
             if reader.IsDBNull(columnIndex)
@@ -146,7 +137,7 @@ type RowReader(reader: NpgsqlDataReader) =
         | true, columnIndex -> reader.GetFieldValue<string[]>(columnIndex)
         | false, _ -> failToRead column "string[]"
 
-    member this.stringArrayOrNull(column: string) : string[] option =
+    member this.stringArrayOrNone(column: string) : string[] option =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
             if reader.IsDBNull(columnIndex)
@@ -159,7 +150,7 @@ type RowReader(reader: NpgsqlDataReader) =
         | true, columnIndex -> reader.GetInt64(columnIndex)
         | false, _ -> failToRead column "int64"
 
-    member this.int64OrNull(column: string) : int64 option =
+    member this.int64OrNone(column: string) : int64 option =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
             if reader.IsDBNull(columnIndex)
@@ -172,7 +163,7 @@ type RowReader(reader: NpgsqlDataReader) =
         | true, columnIndex -> reader.GetString(columnIndex)
         | false, _ -> failToRead column "string"
 
-    member this.stringOrNull(column: string) : string option =
+    member this.stringOrNone(column: string) : string option =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
             if reader.IsDBNull(columnIndex)
@@ -181,14 +172,14 @@ type RowReader(reader: NpgsqlDataReader) =
         | false, _ -> failToRead column "string"
 
     member this.text(column: string) : string = this.string column
-    member this.textOrNull(column: string) : string option = this.stringOrNull column
+    member this.textOrNone(column: string) : string option = this.stringOrNone column
 
     member this.bool(column: string) : bool =
         match columnDict.TryGetValue(column) with
         | true, columnIndex -> reader.GetFieldValue<bool>(columnIndex)
         | false, _ -> failToRead column "bool"
 
-    member this.boolOrNull(column: string) : bool option =
+    member this.boolOrNone(column: string) : bool option =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
             if reader.IsDBNull(columnIndex)
@@ -201,7 +192,7 @@ type RowReader(reader: NpgsqlDataReader) =
         | true, columnIndex -> reader.GetDecimal(columnIndex)
         | false, _ -> failToRead column "decimal"
 
-    member this.decimalOrNull(column: string) : decimal option =
+    member this.decimalOrNone(column: string) : decimal option =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
             if reader.IsDBNull(columnIndex)
@@ -214,7 +205,7 @@ type RowReader(reader: NpgsqlDataReader) =
         | true, columnIndex -> reader.GetDouble(columnIndex)
         | false, _ -> failToRead column "double"
 
-    member this.doubleOrNull(column: string) : double option =
+    member this.doubleOrNone(column: string) : double option =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
             if reader.IsDBNull(columnIndex)
@@ -227,7 +218,7 @@ type RowReader(reader: NpgsqlDataReader) =
         | true, columnIndex -> reader.GetTimeStamp(columnIndex)
         | false, _ -> failToRead column "timestamp"
 
-    member this.timestampOrNull(column: string) =
+    member this.timestampOrNone(column: string) =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
             if reader.IsDBNull(columnIndex)
@@ -242,7 +233,7 @@ type RowReader(reader: NpgsqlDataReader) =
         | true, columnIndex -> reader.GetTimeStamp(columnIndex)
         | false, _ -> failToRead column "timestamp"
 
-    member this.timestamptzOrNull(column: string) =
+    member this.timestamptzOrNone(column: string) =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
             if reader.IsDBNull(columnIndex)
@@ -250,14 +241,13 @@ type RowReader(reader: NpgsqlDataReader) =
             else Some (reader.GetTimeStamp(columnIndex))
         | false, _ -> failToRead column "timestamp"
 
-
     /// Gets the value of the specified column as a globally-unique identifier (GUID).
     member this.uuid(column: string) : Guid =
         match columnDict.TryGetValue(column) with
         | true, columnIndex -> reader.GetGuid(columnIndex)
         | false, _ -> failToRead column "guid"
 
-    member this.uuidOrNull(column: string) : Guid option =
+    member this.uuidOrNone(column: string) : Guid option =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
             if reader.IsDBNull(columnIndex)
@@ -280,7 +270,7 @@ type RowReader(reader: NpgsqlDataReader) =
     /// PostgreSQL's date type represents dates from 4713 BC to 5874897 AD, while .NET's `DateTime` only supports years from 1 to 1999. If you require years outside this range use this accessor.
     ///
     /// See http://www.postgresql.org/docs/current/static/datatype-datetime.html to learn more
-    member this.dateOrNull(column: string) : NpgsqlTypes.NpgsqlDate option =
+    member this.dateOrNone(column: string) : NpgsqlTypes.NpgsqlDate option =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
             if reader.IsDBNull (columnIndex)
@@ -295,7 +285,7 @@ type RowReader(reader: NpgsqlDataReader) =
         | false, _ -> failToRead column "datetime"
 
     /// Gets the value of the specified column as a System.DateTime object.
-    member this.dateTimeOrNull(column: string) : DateTime option =
+    member this.dateTimeOrNone(column: string) : DateTime option =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
             if reader.IsDBNull(columnIndex)
@@ -318,7 +308,7 @@ type RowReader(reader: NpgsqlDataReader) =
         | false, _ -> failToRead column "byte[]"
 
     /// Reads the specified column as `byte[]`
-    member this.byteaOrNull(column: string) : byte[] option =
+    member this.byteaOrNone(column: string) : byte[] option =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
             if reader.IsDBNull(columnIndex)
@@ -333,7 +323,7 @@ type RowReader(reader: NpgsqlDataReader) =
         | false, _ -> failToRead column "float"
 
     /// Gets the value of the specified column as a `System.Single` object.
-    member this.floatOrNull(column: string) : float32 option =
+    member this.floatOrNone(column: string) : float32 option =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
             if reader.IsDBNull(columnIndex)

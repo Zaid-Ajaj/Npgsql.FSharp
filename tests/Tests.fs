@@ -146,7 +146,7 @@ let tests =
                 |> Sql.connect
                 |> Sql.query "SELECT @nullValue::text as output"
                 |> Sql.parameters [ "nullValue", Sql.dbnull ]
-                |> Sql.execute (fun read -> read.textOrNull "output")
+                |> Sql.execute (fun read -> read.textOrNone "output")
                 |> function
                     | Error error -> raise error
                     | Ok output -> Expect.isNone output.[0] "Output was null"
@@ -223,8 +223,8 @@ let tests =
                     connection
                     |> Sql.connect
                     |> Sql.query "SELECT @a::text as first, @b::text as second"
-                    |> Sql.parameters [ "a", Sql.textOrNull a; "b", Sql.textOrNull b ]
-                    |> Sql.execute (fun read -> read.textOrNull "first", read.textOrNull "second")
+                    |> Sql.parameters [ "a", Sql.textOrNone a; "b", Sql.textOrNone b ]
+                    |> Sql.execute (fun read -> read.textOrNone "first", read.textOrNone "second")
 
                 match row with
                 | Ok [ (Some output, None) ] ->
