@@ -61,11 +61,12 @@ let getAllUsers() : Result<User list, exn> =
     defaultConnection
     |> Sql.connectFromConfig
     |> Sql.query "SELECT * FROM users"
-    |> Sql.execute (fun read -> {
-        Id = read.int "user_id"
-        FirstName = read.text "first_name"
-        LastName = read.text "last_name"
-    })
+    |> Sql.execute (fun read ->
+        {
+            Id = read.int "user_id"
+            FirstName = read.text "first_name"
+            LastName = read.text "last_name"
+        })
 ```
 The function is *always* safe and will return you `Result<'t, exn>` from the execution.
 
@@ -86,7 +87,7 @@ let getAllUsers() : Result<User list, exn> =
         {
             Id = read.int "user_id"
             FirstName = read.text "first_name"
-            LastName = read.textOrNull "last_name" // reading nullable column
+            LastName = read.textOrNone "last_name" // reading nullable column
         })
 ```
 ### Make the reading async using `Sql.executeAsync`
@@ -99,7 +100,7 @@ let getAllUsers() : Async<Result<User list, exn>> =
         {
             Id = read.int "user_id"
             FirstName = read.text "first_name"
-            LastName = read.textOrNull "last_name"
+            LastName = read.textOrNone "last_name"
         })
 ```
 
@@ -115,7 +116,7 @@ let getAllUsers() : Async<Result<User list, exn>> =
         {
             Id = read.int "user_id"
             FirstName = read.text "first_name"
-            LastName = read.textOrNull "last_name"
+            LastName = read.textOrNone "last_name"
         })
 ```
 
