@@ -2,9 +2,10 @@ module Main
 
 open Expecto
 open Npgsql.FSharp
-open Npgsql.FSharp.OptionWorkflow
 open System
 open ThrowawayDb.Postgres
+open Npgsql
+open System.Data
 
 type FsTest = {
     test_id: int
@@ -112,6 +113,122 @@ let tests =
                 | Ok users -> Expect.equal users expected "Users can be read correctly"
             }
 
+            test "Sql.executeTransaction works with existing open connection" {
+                use db = buildDatabase()
+                use connection = new NpgsqlConnection(db.ConnectionString)
+                connection.Open()
+                Sql.existingConnection connection
+                |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
+                |> Sql.executeNonQuery
+                |> ignore
+
+                Sql.existingConnection connection
+                |> Sql.executeTransaction [
+                    "INSERT INTO users (username, active, salary) VALUES (@username, @active, @salary)", [
+                        [ ("@username", Sql.text "first"); ("active", Sql.bit true); ("salary", Sql.money 1.0M)  ]
+                        [ ("@username", Sql.text "second"); ("active", Sql.bit false); ("salary", Sql.money 1.0M) ]
+                        [ ("@username", Sql.text "third"); ("active", Sql.bit true);("salary", Sql.money 1.0M) ]
+                    ]
+                ]
+                |> ignore
+
+                let expected = [
+                    {| userId = 1; username = "first"; active = true; salary = 1.0M  |}
+                    {| userId = 2; username = "second"; active = false ; salary = 1.0M |}
+                    {| userId = 3; username = "third"; active = true ; salary = 1.0M |}
+                ]
+
+                Sql.existingConnection connection
+                |> Sql.query "SELECT * FROM users"
+                |> Sql.execute (fun read ->
+                    {|
+                        userId = read.int "user_id"
+                        username = read.string "username"
+                        active = read.bool "active"
+                        salary = read.decimal "salary"
+                    |})
+                |> function
+                | Error err -> raise err
+                | Ok users -> Expect.equal users expected "Users can be read correctly"
+            }
+
+            test "Sql.executeTransaction works with existing connection" {
+                use db = buildDatabase()
+                use connection = new NpgsqlConnection(db.ConnectionString)
+                Sql.existingConnection connection
+                |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
+                |> Sql.executeNonQuery
+                |> ignore
+
+                Sql.existingConnection connection
+                |> Sql.executeTransaction [
+                    "INSERT INTO users (username, active, salary) VALUES (@username, @active, @salary)", [
+                        [ ("@username", Sql.text "first"); ("active", Sql.bit true); ("salary", Sql.money 1.0M)  ]
+                        [ ("@username", Sql.text "second"); ("active", Sql.bit false); ("salary", Sql.money 1.0M) ]
+                        [ ("@username", Sql.text "third"); ("active", Sql.bit true);("salary", Sql.money 1.0M) ]
+                    ]
+                ]
+                |> ignore
+
+                let expected = [
+                    {| userId = 1; username = "first"; active = true; salary = 1.0M  |}
+                    {| userId = 2; username = "second"; active = false ; salary = 1.0M |}
+                    {| userId = 3; username = "third"; active = true ; salary = 1.0M |}
+                ]
+
+                Sql.existingConnection connection
+                |> Sql.query "SELECT * FROM users"
+                |> Sql.execute (fun read ->
+                    {|
+                        userId = read.int "user_id"
+                        username = read.string "username"
+                        active = read.bool "active"
+                        salary = read.decimal "salary"
+                    |})
+                |> function
+                | Error err -> raise err
+                | Ok users -> Expect.equal users expected "Users can be read correctly"
+            }
+
+            test "Sql.executeTransaction leaves existing connection open" {
+                use db = buildDatabase()
+                use connection = new NpgsqlConnection(db.ConnectionString)
+                connection.Open()
+                Sql.existingConnection connection
+                |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
+                |> Sql.executeNonQuery
+                |> ignore
+
+                Sql.existingConnection connection
+                |> Sql.executeTransaction [
+                    "INSERT INTO users (username, active, salary) VALUES (@username, @active, @salary)", [
+                        [ ("@username", Sql.text "first"); ("active", Sql.bit true); ("salary", Sql.money 1.0M)  ]
+                        [ ("@username", Sql.text "second"); ("active", Sql.bit false); ("salary", Sql.money 1.0M) ]
+                        [ ("@username", Sql.text "third"); ("active", Sql.bit true);("salary", Sql.money 1.0M) ]
+                    ]
+                ]
+                |> ignore
+
+                let expected = [
+                    {| userId = 1; username = "first"; active = true; salary = 1.0M  |}
+                    {| userId = 2; username = "second"; active = false ; salary = 1.0M |}
+                    {| userId = 3; username = "third"; active = true ; salary = 1.0M |}
+                ]
+
+                Sql.existingConnection connection
+                |> Sql.query "SELECT * FROM users"
+                |> Sql.execute (fun read ->
+                    {|
+                        userId = read.int "user_id"
+                        username = read.string "username"
+                        active = read.bool "active"
+                        salary = read.decimal "salary"
+                    |})
+                |> ignore
+
+                Expect.equal ConnectionState.Open connection.State "Check existing connection is still open after executeTransaction"
+            }
+
             test "Sql.executeNonQuery works" {
                 use db = buildDatabase()
                 Sql.connect db.ConnectionString
@@ -135,6 +252,60 @@ let tests =
                 |> function
                     | Error error -> raise error
                     | Ok rowsAffected -> Expect.equal 3 rowsAffected "Three entries are deleted"
+            }
+
+            test "Sql.executeNonQuery works with existing connection" {
+                use db = buildDatabase()
+                use connection = new NpgsqlConnection(db.ConnectionString)
+                connection.Open()
+                Sql.existingConnection connection
+                |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
+                |> Sql.executeNonQuery
+                |> ignore
+
+                Sql.existingConnection connection
+                |> Sql.executeTransaction [
+                    "INSERT INTO users (username, active, salary) VALUES (@username, @active, @salary)", [
+                        [ ("@username", Sql.text "first"); ("active", Sql.bit true); ("salary", Sql.money 1.0M)  ]
+                        [ ("@username", Sql.text "second"); ("active", Sql.bit false); ("salary", Sql.money 1.0M) ]
+                        [ ("@username", Sql.text "third"); ("active", Sql.bit true);("salary", Sql.money 1.0M) ]
+                    ]
+                ]
+                |> ignore
+
+                Sql.existingConnection connection
+                |> Sql.query "DELETE FROM users"
+                |> Sql.executeNonQuery
+                |> function
+                    | Error error -> raise error
+                    | Ok rowsAffected -> Expect.equal 3 rowsAffected "Three entries are deleted"
+            }
+
+            test "Sql.executeNonQuery leaves existing connection open" {
+                use db = buildDatabase()
+                use connection = new NpgsqlConnection(db.ConnectionString)
+                connection.Open()
+                Sql.existingConnection connection
+                |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
+                |> Sql.executeNonQuery
+                |> ignore
+
+                Sql.existingConnection connection
+                |> Sql.executeTransaction [
+                    "INSERT INTO users (username, active, salary) VALUES (@username, @active, @salary)", [
+                        [ ("@username", Sql.text "first"); ("active", Sql.bit true); ("salary", Sql.money 1.0M)  ]
+                        [ ("@username", Sql.text "second"); ("active", Sql.bit false); ("salary", Sql.money 1.0M) ]
+                        [ ("@username", Sql.text "third"); ("active", Sql.bit true);("salary", Sql.money 1.0M) ]
+                    ]
+                ]
+                |> ignore
+
+                Sql.existingConnection connection
+                |> Sql.query "DELETE FROM users"
+                |> Sql.executeNonQuery
+                |> ignore
+
+                Expect.equal ConnectionState.Open connection.State "Check existing connection is still open after executeNonQuery"
             }
         ]
 
@@ -234,6 +405,44 @@ let tests =
                 | Error error ->
                     raise error
             }
+
+            test "String option roundtrip with existing connection" {
+                use db = buildDatabase()
+                use connection = new NpgsqlConnection(db.ConnectionString)
+                connection.Open()
+                let a : string option = Some "abc"
+                let b : string option = None
+                let row =
+                    connection
+                    |> Sql.existingConnection
+                    |> Sql.query "SELECT @a::text as first, @b::text as second"
+                    |> Sql.parameters [ "a", Sql.textOrNone a; "b", Sql.textOrNone b ]
+                    |> Sql.execute (fun read -> read.textOrNone "first", read.textOrNone "second")
+
+                match row with
+                | Ok [ (Some output, None) ] ->
+                    Expect.equal a (Some output) "Check Option value read from database is the same as the one sent"
+                | Ok (_) ->
+                    failwith "Unexpected results"
+                | Error error ->
+                    raise error
+            }
+
+            test "String option roundtrip leaves existing connection open" {
+                use db = buildDatabase()
+                use connection = new NpgsqlConnection(db.ConnectionString)
+                connection.Open()
+                let a : string option = Some "abc"
+                let b : string option = None
+                connection
+                |> Sql.existingConnection
+                |> Sql.query "SELECT @a::text as first, @b::text as second"
+                |> Sql.parameters [ "a", Sql.textOrNone a; "b", Sql.textOrNone b ]
+                |> Sql.execute (fun read -> read.textOrNone "first", read.textOrNone "second")
+                |> ignore
+
+                Expect.equal ConnectionState.Open connection.State "Check existing connection is still open after query"
+            }
         ]
 
         testList "Sequential tests that update database state" [
@@ -274,6 +483,43 @@ let tests =
                 | Ok table -> Expect.equal expected table "Check all rows from `fsharp_test` table using a Reader"
             }
 
+            test "Sql.execute with existing connection" {
+                let seedDatabase (connection: NpgsqlConnection) =
+                    connection
+                    |> Sql.existingConnection
+                    |> Sql.executeTransaction [
+                        "INSERT INTO fsharp_test (test_id, test_name) values (@id, @name)", [
+                            [ "@id", Sql.int 1; "@name", Sql.text "first test" ]
+                            [ "@id", Sql.int 2; "@name", Sql.text "second test" ]
+                            [ "@id", Sql.int 3; "@name", Sql.text "third test" ]
+                        ]
+                    ]
+                    |> ignore
+                use db = buildDatabase()
+                use connection = new NpgsqlConnection(db.ConnectionString)
+                connection.Open()
+                seedDatabase connection
+
+                let table =
+                    Sql.existingConnection connection
+                    |> Sql.query "SELECT * FROM fsharp_test"
+                    |> Sql.prepare
+                    |> Sql.execute (fun read -> {
+                        test_id = read.int "test_id";
+                        test_name = read.string "test_name"
+                    })
+
+                let expected = [
+                    { test_id = 1; test_name = "first test" }
+                    { test_id = 2; test_name = "second test" }
+                    { test_id = 3; test_name = "third test" }
+                ]
+
+                match table with
+                | Error err -> raise err
+                | Ok table -> Expect.equal expected table "Check all rows from `fsharp_test` table using a Reader"
+            }
+
             test "Create table with Jsonb data" {
                 let seedDatabase (connection: string) (json: string) =
                     connection
@@ -291,6 +537,32 @@ let tests =
                 let dbJson =
                     connection
                     |> Sql.connect
+                    |> Sql.query "SELECT data ->> 'property' as property FROM data_with_jsonb"
+                    |> Sql.execute(fun read -> read.text "property")
+
+                match dbJson with
+                | Error error -> raise error
+                | Ok json -> Expect.equal json.[0] jsonData "Check json read from database"
+            }
+
+            test "Create table with Jsonb data with existing connection" {
+                let seedDatabase (connection: NpgsqlConnection) (json: string) =
+                    connection
+                    |> Sql.existingConnection
+                    |> Sql.query "INSERT INTO data_with_jsonb (data) VALUES (@jsonb)"
+                    |> Sql.parameters ["jsonb", SqlValue.Jsonb json]
+                    |> Sql.executeNonQuery
+                    |> ignore
+                let jsonData = "value from F#"
+                let inputJson = "{\"property\": \"" + jsonData + "\"}"
+                use db = buildDatabase()
+                use connection = new NpgsqlConnection(db.ConnectionString)
+                connection.Open()
+                seedDatabase connection inputJson
+
+                let dbJson =
+                    connection
+                    |> Sql.existingConnection
                     |> Sql.query "SELECT data ->> 'property' as property FROM data_with_jsonb"
                     |> Sql.execute(fun read -> read.text "property")
 
@@ -383,6 +655,50 @@ let tests =
                 | Ok values -> Expect.equal expected values "All rows from `string_array_test` table"
             }
 
+            test "Handle String Array with existing connection" {
+                let getString () =
+                    let temp = Guid.NewGuid()
+                    temp.ToString("N")
+                let a = [| getString() |]
+                let b = [| getString(); getString() |]
+                let c : string array = [||]
+                let seedDatabase (connection: NpgsqlConnection) =
+                    connection
+                    |> Sql.existingConnection
+                    |> Sql.executeTransaction [
+                        "INSERT INTO string_array_test (id, values) values (@id, @values)", [
+                            [ "@id", Sql.int 1; "@values", Sql.stringArray a ]
+                            [ "@id", Sql.int 2; "@values", Sql.stringArray b ]
+                            [ "@id", Sql.int 3; "@values", Sql.stringArray c ]
+                        ]
+                    ]
+                    |> ignore
+
+                use db = buildDatabase()
+                use connection = new NpgsqlConnection(db.ConnectionString)
+                connection.Open()
+                seedDatabase connection
+
+                let table =
+                    connection
+                    |> Sql.existingConnection
+                    |> Sql.query "SELECT * FROM string_array_test"
+                    |> Sql.execute (fun read -> {
+                        id = read.int "id"
+                        values = read.stringArray "values"
+                    })
+
+                let expected = [
+                    { id = 1; values = a }
+                    { id = 2; values = b }
+                    { id = 3; values = c }
+                ]
+
+                match table with
+                | Error error -> raise error
+                | Ok values -> Expect.equal expected values "All rows from `string_array_test` table"
+            }
+
             test "Handle int Array" {
                 let a = [| 1; 2 |]
                 let b = [| for i in 0..10 do yield i |]
@@ -406,6 +722,47 @@ let tests =
                 let table =
                     connection
                     |> Sql.connect
+                    |> Sql.query "SELECT * FROM int_array_test"
+                    |> Sql.execute (fun read -> {
+                        id = read.int "id"
+                        integers = read.intArray "integers"
+                    })
+
+                let expected = [
+                    { id = 1; integers = a }
+                    { id = 2; integers = b }
+                    { id = 3; integers = c }
+                ]
+
+                match table with
+                | Error error -> raise error
+                | Ok table -> Expect.equal expected table  "All rows from `int_array_test` table"
+            }
+
+            test "Handle int Array with existing connection" {
+                let a = [| 1; 2 |]
+                let b = [| for i in 0..10 do yield i |]
+                let c : int array = [||]
+                let seedDatabase (connection: NpgsqlConnection) =
+                    connection
+                    |> Sql.existingConnection
+                    |> Sql.executeTransaction [
+                        "INSERT INTO int_array_test (id, integers) values (@id, @integers)", [
+                            [ "@id", Sql.int 1; "@integers", Sql.intArray a ]
+                            [ "@id", Sql.int 2; "@integers", Sql.intArray b ]
+                            [ "@id", Sql.int 3; "@integers", Sql.intArray c ]
+                        ]
+                    ]
+                    |> ignore
+
+                use db = buildDatabase()
+                use connection = new NpgsqlConnection(db.ConnectionString)
+                connection.Open()
+                seedDatabase connection
+
+                let table =
+                    connection
+                    |> Sql.existingConnection
                     |> Sql.query "SELECT * FROM int_array_test"
                     |> Sql.execute (fun read -> {
                         id = read.int "id"
