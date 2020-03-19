@@ -147,3 +147,20 @@ let getAllUsers() : Result<int, exn> =
     |> Sql.parameters [ "is_active", Sql.bit false ]
     |> Sql.executeNonQuery
 ```
+### Use an existing connections
+Sometimes, you already have constructed a `NpgsqlConnection` and want to use with the `Sql` module. You can use the function `Sql.existingConnection` which takes a preconfigured connection from which the queries or transactions are executed. Note that this library will *open the connection* if it is not already open and it will leave the connection open (deos not dispose of it) when it finishes running. This means that you have to manage the disposal of the connection yourself:
+```fs
+use connection = new NpgsqlConnection("YOUR CONNECTION STRING")
+connection.Open()
+
+let users =
+    connection
+    |> Sql.existingConnection
+    |> Sql.query "SELECT * FROM users"
+    |> Sql.execute (fun read ->
+        {
+            Id = read.int "user_id"
+            FirstName = read.text "first_name"
+        })
+```
+Note in this example, when we write `use connection = ...` it means the connection will be disposed at the end of the scopre where this value is bound, not internally from the `Sql` module.
