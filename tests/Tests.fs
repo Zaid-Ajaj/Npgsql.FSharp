@@ -112,10 +112,48 @@ let tests =
                 | Ok users -> Expect.equal users expected "Users can be read correctly"
             }
 
-            test "Sql.executeTransaction works with existing connection" {
+            test "Sql.executeTransaction works with existing open connection" {
                 use db = buildDatabase()
                 use connection = new NpgsqlConnection(db.ConnectionString)
                 connection.Open()
+                Sql.existingConnection connection
+                |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
+                |> Sql.executeNonQuery
+                |> ignore
+
+                Sql.existingConnection connection
+                |> Sql.executeTransaction [
+                    "INSERT INTO users (username, active, salary) VALUES (@username, @active, @salary)", [
+                        [ ("@username", Sql.text "first"); ("active", Sql.bit true); ("salary", Sql.money 1.0M)  ]
+                        [ ("@username", Sql.text "second"); ("active", Sql.bit false); ("salary", Sql.money 1.0M) ]
+                        [ ("@username", Sql.text "third"); ("active", Sql.bit true);("salary", Sql.money 1.0M) ]
+                    ]
+                ]
+                |> ignore
+
+                let expected = [
+                    {| userId = 1; username = "first"; active = true; salary = 1.0M  |}
+                    {| userId = 2; username = "second"; active = false ; salary = 1.0M |}
+                    {| userId = 3; username = "third"; active = true ; salary = 1.0M |}
+                ]
+
+                Sql.existingConnection connection
+                |> Sql.query "SELECT * FROM users"
+                |> Sql.execute (fun read ->
+                    {|
+                        userId = read.int "user_id"
+                        username = read.string "username"
+                        active = read.bool "active"
+                        salary = read.decimal "salary"
+                    |})
+                |> function
+                | Error err -> raise err
+                | Ok users -> Expect.equal users expected "Users can be read correctly"
+            }
+
+            test "Sql.executeTransaction works with existing connection" {
+                use db = buildDatabase()
+                use connection = new NpgsqlConnection(db.ConnectionString)
                 Sql.existingConnection connection
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
                 |> Sql.executeNonQuery
