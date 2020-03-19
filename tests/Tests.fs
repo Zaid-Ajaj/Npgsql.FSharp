@@ -2,7 +2,6 @@ module Main
 
 open Expecto
 open Npgsql.FSharp
-open Npgsql.FSharp.OptionWorkflow
 open System
 open ThrowawayDb.Postgres
 open Npgsql
@@ -301,6 +300,28 @@ let tests =
                 | Error error ->
                     raise error
             }
+
+            test "String option roundtrip with existing connection" {
+                use db = buildDatabase()
+                use connection = new NpgsqlConnection(db.ConnectionString)
+                connection.Open()
+                let a : string option = Some "abc"
+                let b : string option = None
+                let row =
+                    connection
+                    |> Sql.existingConnection
+                    |> Sql.query "SELECT @a::text as first, @b::text as second"
+                    |> Sql.parameters [ "a", Sql.textOrNone a; "b", Sql.textOrNone b ]
+                    |> Sql.execute (fun read -> read.textOrNone "first", read.textOrNone "second")
+
+                match row with
+                | Ok [ (Some output, None) ] ->
+                    Expect.equal a (Some output) "Check Option value read from database is the same as the one sent"
+                | Ok (_) ->
+                    failwith "Unexpected results"
+                | Error error ->
+                    raise error
+            }
         ]
 
         testList "Sequential tests that update database state" [
@@ -403,6 +424,32 @@ let tests =
                 | Ok json -> Expect.equal json.[0] jsonData "Check json read from database"
             }
 
+            test "Create table with Jsonb data with existing connection" {
+                let seedDatabase (connection: NpgsqlConnection) (json: string) =
+                    connection
+                    |> Sql.existingConnection
+                    |> Sql.query "INSERT INTO data_with_jsonb (data) VALUES (@jsonb)"
+                    |> Sql.parameters ["jsonb", SqlValue.Jsonb json]
+                    |> Sql.executeNonQuery
+                    |> ignore
+                let jsonData = "value from F#"
+                let inputJson = "{\"property\": \"" + jsonData + "\"}"
+                use db = buildDatabase()
+                use connection = new NpgsqlConnection(db.ConnectionString)
+                connection.Open()
+                seedDatabase connection inputJson
+
+                let dbJson =
+                    connection
+                    |> Sql.existingConnection
+                    |> Sql.query "SELECT data ->> 'property' as property FROM data_with_jsonb"
+                    |> Sql.execute(fun read -> read.text "property")
+
+                match dbJson with
+                | Error error -> raise error
+                | Ok json -> Expect.equal json.[0] jsonData "Check json read from database"
+            }
+
             test "Infinity time" {
                 let seedDatabase (connection: string) =
                     connection
@@ -487,6 +534,50 @@ let tests =
                 | Ok values -> Expect.equal expected values "All rows from `string_array_test` table"
             }
 
+            test "Handle String Array with existing connection" {
+                let getString () =
+                    let temp = Guid.NewGuid()
+                    temp.ToString("N")
+                let a = [| getString() |]
+                let b = [| getString(); getString() |]
+                let c : string array = [||]
+                let seedDatabase (connection: NpgsqlConnection) =
+                    connection
+                    |> Sql.existingConnection
+                    |> Sql.executeTransaction [
+                        "INSERT INTO string_array_test (id, values) values (@id, @values)", [
+                            [ "@id", Sql.int 1; "@values", Sql.stringArray a ]
+                            [ "@id", Sql.int 2; "@values", Sql.stringArray b ]
+                            [ "@id", Sql.int 3; "@values", Sql.stringArray c ]
+                        ]
+                    ]
+                    |> ignore
+
+                use db = buildDatabase()
+                use connection = new NpgsqlConnection(db.ConnectionString)
+                connection.Open()
+                seedDatabase connection
+
+                let table =
+                    connection
+                    |> Sql.existingConnection
+                    |> Sql.query "SELECT * FROM string_array_test"
+                    |> Sql.execute (fun read -> {
+                        id = read.int "id"
+                        values = read.stringArray "values"
+                    })
+
+                let expected = [
+                    { id = 1; values = a }
+                    { id = 2; values = b }
+                    { id = 3; values = c }
+                ]
+
+                match table with
+                | Error error -> raise error
+                | Ok values -> Expect.equal expected values "All rows from `string_array_test` table"
+            }
+
             test "Handle int Array" {
                 let a = [| 1; 2 |]
                 let b = [| for i in 0..10 do yield i |]
@@ -510,6 +601,47 @@ let tests =
                 let table =
                     connection
                     |> Sql.connect
+                    |> Sql.query "SELECT * FROM int_array_test"
+                    |> Sql.execute (fun read -> {
+                        id = read.int "id"
+                        integers = read.intArray "integers"
+                    })
+
+                let expected = [
+                    { id = 1; integers = a }
+                    { id = 2; integers = b }
+                    { id = 3; integers = c }
+                ]
+
+                match table with
+                | Error error -> raise error
+                | Ok table -> Expect.equal expected table  "All rows from `int_array_test` table"
+            }
+
+            test "Handle int Array with existing connection" {
+                let a = [| 1; 2 |]
+                let b = [| for i in 0..10 do yield i |]
+                let c : int array = [||]
+                let seedDatabase (connection: NpgsqlConnection) =
+                    connection
+                    |> Sql.existingConnection
+                    |> Sql.executeTransaction [
+                        "INSERT INTO int_array_test (id, integers) values (@id, @integers)", [
+                            [ "@id", Sql.int 1; "@integers", Sql.intArray a ]
+                            [ "@id", Sql.int 2; "@integers", Sql.intArray b ]
+                            [ "@id", Sql.int 3; "@integers", Sql.intArray c ]
+                        ]
+                    ]
+                    |> ignore
+
+                use db = buildDatabase()
+                use connection = new NpgsqlConnection(db.ConnectionString)
+                connection.Open()
+                seedDatabase connection
+
+                let table =
+                    connection
+                    |> Sql.existingConnection
                     |> Sql.query "SELECT * FROM int_array_test"
                     |> Sql.execute (fun read -> {
                         id = read.int "id"
