@@ -5,6 +5,7 @@ open Npgsql.FSharp
 open System
 open ThrowawayDb.Postgres
 open Npgsql
+open System.Data
 
 type FsTest = {
     test_id: int
@@ -189,6 +190,45 @@ let tests =
                 | Ok users -> Expect.equal users expected "Users can be read correctly"
             }
 
+            test "Sql.executeTransaction leaves existing connection open" {
+                use db = buildDatabase()
+                use connection = new NpgsqlConnection(db.ConnectionString)
+                connection.Open()
+                Sql.existingConnection connection
+                |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
+                |> Sql.executeNonQuery
+                |> ignore
+
+                Sql.existingConnection connection
+                |> Sql.executeTransaction [
+                    "INSERT INTO users (username, active, salary) VALUES (@username, @active, @salary)", [
+                        [ ("@username", Sql.text "first"); ("active", Sql.bit true); ("salary", Sql.money 1.0M)  ]
+                        [ ("@username", Sql.text "second"); ("active", Sql.bit false); ("salary", Sql.money 1.0M) ]
+                        [ ("@username", Sql.text "third"); ("active", Sql.bit true);("salary", Sql.money 1.0M) ]
+                    ]
+                ]
+                |> ignore
+
+                let expected = [
+                    {| userId = 1; username = "first"; active = true; salary = 1.0M  |}
+                    {| userId = 2; username = "second"; active = false ; salary = 1.0M |}
+                    {| userId = 3; username = "third"; active = true ; salary = 1.0M |}
+                ]
+
+                Sql.existingConnection connection
+                |> Sql.query "SELECT * FROM users"
+                |> Sql.execute (fun read ->
+                    {|
+                        userId = read.int "user_id"
+                        username = read.string "username"
+                        active = read.bool "active"
+                        salary = read.decimal "salary"
+                    |})
+                |> ignore
+
+                Expect.equal ConnectionState.Open connection.State "Check existing connection is still open after executeTransaction"
+            }
+
             test "Sql.executeNonQuery works" {
                 use db = buildDatabase()
                 Sql.connect db.ConnectionString
@@ -239,6 +279,33 @@ let tests =
                 |> function
                     | Error error -> raise error
                     | Ok rowsAffected -> Expect.equal 3 rowsAffected "Three entries are deleted"
+            }
+
+            test "Sql.executeNonQuery leaves existing connection open" {
+                use db = buildDatabase()
+                use connection = new NpgsqlConnection(db.ConnectionString)
+                connection.Open()
+                Sql.existingConnection connection
+                |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
+                |> Sql.executeNonQuery
+                |> ignore
+
+                Sql.existingConnection connection
+                |> Sql.executeTransaction [
+                    "INSERT INTO users (username, active, salary) VALUES (@username, @active, @salary)", [
+                        [ ("@username", Sql.text "first"); ("active", Sql.bit true); ("salary", Sql.money 1.0M)  ]
+                        [ ("@username", Sql.text "second"); ("active", Sql.bit false); ("salary", Sql.money 1.0M) ]
+                        [ ("@username", Sql.text "third"); ("active", Sql.bit true);("salary", Sql.money 1.0M) ]
+                    ]
+                ]
+                |> ignore
+
+                Sql.existingConnection connection
+                |> Sql.query "DELETE FROM users"
+                |> Sql.executeNonQuery
+                |> ignore
+
+                Expect.equal ConnectionState.Open connection.State "Check existing connection is still open after executeNonQuery"
             }
         ]
 
@@ -359,6 +426,22 @@ let tests =
                     failwith "Unexpected results"
                 | Error error ->
                     raise error
+            }
+
+            test "String option roundtrip leaves existing connection open" {
+                use db = buildDatabase()
+                use connection = new NpgsqlConnection(db.ConnectionString)
+                connection.Open()
+                let a : string option = Some "abc"
+                let b : string option = None
+                connection
+                |> Sql.existingConnection
+                |> Sql.query "SELECT @a::text as first, @b::text as second"
+                |> Sql.parameters [ "a", Sql.textOrNone a; "b", Sql.textOrNone b ]
+                |> Sql.execute (fun read -> read.textOrNone "first", read.textOrNone "second")
+                |> ignore
+
+                Expect.equal ConnectionState.Open connection.State "Check existing connection is still open after query"
             }
         ]
 
