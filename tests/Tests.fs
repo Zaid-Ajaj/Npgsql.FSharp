@@ -27,12 +27,18 @@ type IntArrayTest = {
     integers: int array
 }
 
+type UuidArrayTest = {
+    id: int
+    guids: Guid array
+}
+
 let buildDatabaseConnection handleInfinity : ThrowawayDatabase =
     let createFSharpTable = "create table if not exists fsharp_test (test_id int, test_name text)"
     let createJsonbTable = "create table if not exists data_with_jsonb (data jsonb)"
     let createTimestampzTable = "create table if not exists timestampz_test (version integer, date1 timestamptz, date2 timestamptz)"
     let createTimespanTable = "create table if not exists timespan_test (id int, at time without time zone)"
     let createStringArrayTable = "create table if not exists string_array_test (id int, values text [])"
+    let createUuidArrayTable = "create table if not exists uuid_array_test (id int, values uuid [])"
     let createIntArrayTable = "create table if not exists int_array_test (id int, integers int [])"
     let createExtensionHStore = "create extension if not exists hstore"
     let createExtensionUuid = "create extension if not exists \"uuid-ossp\""
@@ -65,6 +71,7 @@ let buildDatabaseConnection handleInfinity : ThrowawayDatabase =
         createExtensionHStore, [ ]
         createIntArrayTable, [ ]
         createExtensionUuid, [ ]
+        createUuidArrayTable, []
     ]
     |> ignore
 
@@ -780,6 +787,46 @@ let tests =
                 | Ok table -> Expect.equal expected table  "All rows from `int_array_test` table"
             }
 
+            test "Handle UUID Array" {
+                let getUUID () = Guid.NewGuid()
+                let a = [| getUUID() |]
+                let b = [| getUUID(); getUUID() |]
+                let c : Guid array = [||]
+                let seedDatabase (connection: string) =
+                    connection
+                    |> Sql.connect
+                    |> Sql.executeTransaction [
+                        "INSERT INTO uuid_array_test (id, values) values (@id, @values)", [
+                            [ "@id", Sql.int 1; "@values", Sql.uuidArray a ]
+                            [ "@id", Sql.int 2; "@values", Sql.uuidArray b ]
+                            [ "@id", Sql.int 3; "@values", Sql.uuidArray c ]
+                        ]
+                    ]
+                    |> ignore
+
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
+                seedDatabase connection
+
+                let table =
+                    connection
+                    |> Sql.connect
+                    |> Sql.query "SELECT * FROM uuid_array_test"
+                    |> Sql.execute (fun read -> {
+                        id = read.int "id"
+                        guids = read.uuidArray "values"
+                    })
+
+                let expected = [
+                    { id = 1; guids = a }
+                    { id = 2; guids = b }
+                    { id = 3; guids = c }
+                ]
+
+                match table with
+                | Error error -> raise error
+                | Ok values -> Expect.equal expected values "All rows from `uuid_array_test` table"
+            }
         ] |> testSequenced
 
     ]

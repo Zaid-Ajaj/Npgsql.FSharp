@@ -17,6 +17,7 @@ type SqlValue =
     | Decimal of decimal
     | Bytea of byte[]
     | Uuid of Guid
+    | UuidArray of Guid []
     | Timestamp of DateTime
     | TimestampWithTimeZone of DateTime
     | Time of TimeSpan

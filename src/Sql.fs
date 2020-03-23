@@ -47,6 +47,8 @@ type Sql() =
     static member timestamptzOrNone(value: DateTime option) = Utils.sqlMap value Sql.timestamptz
     static member uuid(value: Guid) = SqlValue.Uuid value
     static member uuidOrNone(value: Guid option) = Utils.sqlMap value Sql.uuid
+    static member uuidArray(value: Guid []) = SqlValue.UuidArray value
+    static member uuidArrayOrNone(value: Guid [] option) = Utils.sqlMap value Sql.uuidArray
     static member bytea(value: byte[]) = SqlValue.Bytea value
     static member byteaOrNone(value: byte[] option) = Utils.sqlMap value Sql.bytea
     static member stringArray(value: string[]) = SqlValue.StringArray value
@@ -254,6 +256,20 @@ type RowReader(reader: NpgsqlDataReader) =
             then None
             else Some(reader.GetGuid(columnIndex))
         | false, _ -> failToRead column "guid"
+
+    /// Gets the value of the specified column as a globally-unique identifier (GUID).
+    member this.uuidArray(column: string) : Guid [] =
+        match columnDict.TryGetValue(column) with
+        | true, columnIndex -> reader.GetFieldValue<Guid []>(columnIndex)
+        | false, _ -> failToRead column "guid[]"
+
+    member this.uuidArrayOrNone(column: string) : Guid [] option =
+        match columnDict.TryGetValue(column) with
+        | true, columnIndex ->
+            if reader.IsDBNull(columnIndex)
+            then None
+            else Some(reader.GetFieldValue<Guid []>(columnIndex))
+        | false, _ -> failToRead column "guid[]"
 
     /// Gets the value of the specified column as an `NpgsqlTypes.NpgsqlDate`, Npgsql's provider-specific type for dates.
     ///
@@ -488,6 +504,7 @@ module Sql =
             | SqlValue.String text -> upcast text, Some NpgsqlTypes.NpgsqlDbType.Text
             | SqlValue.Int i -> upcast i, Some NpgsqlTypes.NpgsqlDbType.Integer
             | SqlValue.Uuid x -> upcast x, Some NpgsqlTypes.NpgsqlDbType.Uuid
+            | SqlValue.UuidArray x -> upcast x, Some (NpgsqlTypes.NpgsqlDbType.Array ||| NpgsqlTypes.NpgsqlDbType.Uuid)
             | SqlValue.Short x -> upcast x, Some NpgsqlTypes.NpgsqlDbType.Smallint
             | SqlValue.Date date -> upcast date, Some NpgsqlTypes.NpgsqlDbType.Date
             | SqlValue.Timestamp x -> upcast x, Some NpgsqlTypes.NpgsqlDbType.Timestamp
