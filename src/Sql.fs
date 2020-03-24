@@ -542,7 +542,7 @@ module Sql =
             else
             let connection = getConnection props
             try
-                if props.ExistingConnection.IsNone || connection.State <> ConnectionState.Open
+                if not (connection.State.HasFlag ConnectionState.Open)
                 then connection.Open()
                 use transaction = connection.BeginTransaction()
                 let affectedRowsByQuery = ResizeArray<int>()
@@ -579,10 +579,9 @@ module Sql =
                 else
                 let connection = getConnection props
                 try
-                    if props.ExistingConnection.IsNone || connection.State <> ConnectionState.Open
-                    then connection.Open()
-                    do! Async.AwaitTask (connection.OpenAsync mergedToken)
-                    use transaction = connection.BeginTransaction()
+                    if not (connection.State.HasFlag ConnectionState.Open)
+                    then do! Async.AwaitTask (connection.OpenAsync mergedToken)
+                    use transaction = connection.BeginTransaction ()
                     let affectedRowsByQuery = ResizeArray<int>()
                     for (query, parameterSets) in queries do
                         if List.isEmpty parameterSets
@@ -610,7 +609,7 @@ module Sql =
             if List.isEmpty props.SqlQuery then failwith "No query provided to execute. Please use Sql.query"
             let connection = getConnection props
             try
-                if props.ExistingConnection.IsNone || connection.State <> ConnectionState.Open
+                if not (connection.State.HasFlag ConnectionState.Open)
                 then connection.Open()
                 use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
                 do populateCmd command props
@@ -636,9 +635,8 @@ module Sql =
                 if List.isEmpty props.SqlQuery then failwith "No query provided to execute. Please use Sql.query"
                 let connection = getConnection props
                 try
-                    if props.ExistingConnection.IsNone || connection.State <> ConnectionState.Open
-                    then connection.Open()
-                    do! Async.AwaitTask(connection.OpenAsync(mergedToken))
+                    if not (connection.State.HasFlag ConnectionState.Open)
+                    then do! Async.AwaitTask(connection.OpenAsync(mergedToken))
                     use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
                     do populateCmd command props
                     if props.NeedPrepare then command.Prepare()
@@ -661,7 +659,7 @@ module Sql =
             if List.isEmpty props.SqlQuery then failwith "No query provided to execute..."
             let connection = getConnection props
             try
-                if props.ExistingConnection.IsNone || connection.State <> ConnectionState.Open
+                if not (connection.State.HasFlag ConnectionState.Open)
                 then connection.Open()
                 use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
                 populateCmd command props
@@ -683,9 +681,8 @@ module Sql =
                 if List.isEmpty props.SqlQuery then failwith "No query provided to execute. Please use Sql.query"
                 let connection = getConnection props
                 try
-                    if props.ExistingConnection.IsNone || connection.State <> ConnectionState.Open 
-                    then connection.Open()
-                    do! Async.AwaitTask (connection.OpenAsync(mergedToken))
+                    if not (connection.State.HasFlag ConnectionState.Open)
+                    then do! Async.AwaitTask (connection.OpenAsync(mergedToken))
                     use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
                     populateCmd command props
                     if props.NeedPrepare then command.Prepare()
