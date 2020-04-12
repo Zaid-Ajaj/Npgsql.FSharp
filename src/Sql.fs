@@ -55,6 +55,8 @@ type Sql() =
     static member stringArrayOrNone(value: string[] option) = Utils.sqlMap value Sql.stringArray
     static member intArray(value: int[]) = SqlValue.IntArray value
     static member intArrayOrNone(value: int[] option) = Utils.sqlMap value Sql.intArray
+    static member value(value: obj) = SqlValue.Value value
+    static member valueOrNone(value: obj option) = Utils.sqlMap value Sql.value
     static member dbnull = SqlValue.Null
 
 /// Specifies how to manage SSL.
@@ -346,6 +348,11 @@ type RowReader(reader: NpgsqlDataReader) =
             then None
             else Some (reader.GetFloat(columnIndex))
         | false, _ -> failToRead column "float"
+        
+    member this.value(column: string) : obj =
+        match columnDict.TryGetValue(column) with
+        | true, columnIndex -> reader.GetValue(columnIndex)
+        | false, _ -> failToRead column "value"
 
 [<RequireQualifiedAccess>]
 module Sql =
@@ -521,6 +528,7 @@ module Sql =
             | SqlValue.Time x -> upcast x, Some NpgsqlTypes.NpgsqlDbType.Time
             | SqlValue.StringArray x -> upcast x, Some (NpgsqlTypes.NpgsqlDbType.Array ||| NpgsqlTypes.NpgsqlDbType.Text )
             | SqlValue.IntArray x -> upcast x, Some (NpgsqlTypes.NpgsqlDbType.Array ||| NpgsqlTypes.NpgsqlDbType.Integer )
+            | SqlValue.Value x -> x, Some NpgsqlTypes.NpgsqlDbType.Unknown
 
           let paramName =
             if not (paramName.StartsWith "@")

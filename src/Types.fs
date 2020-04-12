@@ -1,5 +1,6 @@
 namespace Npgsql.FSharp
 
+
 open System
 
 [<RequireQualifiedAccess>]
@@ -25,3 +26,4 @@ type SqlValue =
     | Jsonb of string
     | StringArray of string array
     | IntArray of int array
+    | Value of obj
