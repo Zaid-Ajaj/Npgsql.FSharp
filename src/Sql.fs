@@ -353,6 +353,14 @@ type RowReader(reader: NpgsqlDataReader) =
         match columnDict.TryGetValue(column) with
         | true, columnIndex -> reader.GetValue(columnIndex)
         | false, _ -> failToRead column "value"
+        
+    member this.valueOrNone(column: string) : obj option =
+        match columnDict.TryGetValue(column) with
+        | true, columnIndex ->
+            if reader.IsDBNull(columnIndex)
+            then None
+            else Some (reader.GetValue(columnIndex))
+        | false, _ -> failToRead column "value"
 
 [<RequireQualifiedAccess>]
 module Sql =
