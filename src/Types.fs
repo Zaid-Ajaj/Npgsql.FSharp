@@ -1,9 +1,11 @@
 namespace Npgsql.FSharp
 
 open System
+open Npgsql
 
 [<RequireQualifiedAccess>]
 type SqlValue =
+    | Parameter of NpgsqlParameter 
     | Null
     | TinyInt of int8
     | Short of int16

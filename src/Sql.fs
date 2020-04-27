@@ -2,6 +2,7 @@ namespace Npgsql.FSharp
 
 open System
 open Npgsql
+open NpgsqlTypes
 open System.Threading
 open System.Data
 open System.Collections.Generic
@@ -56,8 +57,9 @@ type Sql() =
     static member intArray(value: int[]) = SqlValue.IntArray value
     static member intArrayOrNone(value: int[] option) = Utils.sqlMap value Sql.intArray
     static member dbnull = SqlValue.Null
-
-/// Specifies how to manage SSL.
+    static member parameter(genericParameter: NpgsqlParameter) = SqlValue.Parameter genericParameter
+     
+/// Specifies how to manage SSL. 
 [<RequireQualifiedAccess>]
 type SslMode =
     /// SSL is disabled. If the server requires SSL, the connection will fail.
@@ -498,38 +500,39 @@ module Sql =
 
     let private populateRow (cmd: NpgsqlCommand) (row: (string * SqlValue) list) =
         for (paramName, value) in row do
-          let paramValue, paramType : (obj * NpgsqlTypes.NpgsqlDbType option) =
+            
+            let normalizedParameterName =
+                if not (paramName.StartsWith "@")
+                then sprintf "@%s" paramName
+                else paramName
+
+            let add value valueType = 
+                cmd.Parameters.AddWithValue(normalizedParameterName, valueType, value)
+                |> ignore
+
             match value with
-            | SqlValue.Bit value -> upcast value, Some NpgsqlTypes.NpgsqlDbType.Bit
-            | SqlValue.String text -> upcast text, Some NpgsqlTypes.NpgsqlDbType.Text
-            | SqlValue.Int i -> upcast i, Some NpgsqlTypes.NpgsqlDbType.Integer
-            | SqlValue.Uuid x -> upcast x, Some NpgsqlTypes.NpgsqlDbType.Uuid
-            | SqlValue.UuidArray x -> upcast x, Some (NpgsqlTypes.NpgsqlDbType.Array ||| NpgsqlTypes.NpgsqlDbType.Uuid)
-            | SqlValue.Short x -> upcast x, Some NpgsqlTypes.NpgsqlDbType.Smallint
-            | SqlValue.Date date -> upcast date, Some NpgsqlTypes.NpgsqlDbType.Date
-            | SqlValue.Timestamp x -> upcast x, Some NpgsqlTypes.NpgsqlDbType.Timestamp
-            | SqlValue.TimestampWithTimeZone x -> upcast x, Some NpgsqlTypes.NpgsqlDbType.TimestampTz
-            | SqlValue.Number n -> upcast n, Some NpgsqlTypes.NpgsqlDbType.Double
-            | SqlValue.Bool b -> upcast b,  Some NpgsqlTypes.NpgsqlDbType.Boolean
-            | SqlValue.Decimal x -> upcast x, Some NpgsqlTypes.NpgsqlDbType.Money
-            | SqlValue.Long x -> upcast x, Some NpgsqlTypes.NpgsqlDbType.Bigint
-            | SqlValue.Bytea x -> upcast x, Some NpgsqlTypes.NpgsqlDbType.Bytea
-            | SqlValue.TimeWithTimeZone x -> upcast x, Some NpgsqlTypes.NpgsqlDbType.TimeTz
-            | SqlValue.Null -> upcast DBNull.Value, None
-            | SqlValue.TinyInt x -> upcast x, None
-            | SqlValue.Jsonb x -> upcast x, Some NpgsqlTypes.NpgsqlDbType.Jsonb
-            | SqlValue.Time x -> upcast x, Some NpgsqlTypes.NpgsqlDbType.Time
-            | SqlValue.StringArray x -> upcast x, Some (NpgsqlTypes.NpgsqlDbType.Array ||| NpgsqlTypes.NpgsqlDbType.Text )
-            | SqlValue.IntArray x -> upcast x, Some (NpgsqlTypes.NpgsqlDbType.Array ||| NpgsqlTypes.NpgsqlDbType.Integer )
-
-          let paramName =
-            if not (paramName.StartsWith "@")
-            then sprintf "@%s" paramName
-            else paramName
-
-          match paramType with
-          | Some x -> cmd.Parameters.AddWithValue(paramName, x, paramValue) |> ignore
-          | None -> cmd.Parameters.AddWithValue(paramName, paramValue) |> ignore
+            | SqlValue.Bit bit -> add bit NpgsqlDbType.Bit
+            | SqlValue.String text -> add text NpgsqlDbType.Text
+            | SqlValue.Int number -> add number NpgsqlDbType.Integer
+            | SqlValue.Uuid uuid -> add uuid NpgsqlDbType.Uuid
+            | SqlValue.UuidArray uuidArray -> add uuidArray (NpgsqlDbType.Array ||| NpgsqlDbType.Uuid)
+            | SqlValue.Short number -> add number NpgsqlDbType.Smallint
+            | SqlValue.Date date -> add date NpgsqlDbType.Date
+            | SqlValue.Timestamp timestamp -> add timestamp NpgsqlDbType.Timestamp
+            | SqlValue.TimestampWithTimeZone timestampTz -> add timestampTz NpgsqlDbType.TimestampTz
+            | SqlValue.Number number -> add number NpgsqlDbType.Double
+            | SqlValue.Bool boolean -> add boolean NpgsqlDbType.Boolean
+            | SqlValue.Decimal number -> add number NpgsqlDbType.Money
+            | SqlValue.Long number -> add number NpgsqlDbType.Bigint
+            | SqlValue.Bytea binary -> add binary NpgsqlDbType.Bytea
+            | SqlValue.TimeWithTimeZone x -> add x NpgsqlDbType.TimeTz
+            | SqlValue.Null -> cmd.Parameters.AddWithValue(normalizedParameterName, DBNull.Value) |> ignore
+            | SqlValue.TinyInt x -> cmd.Parameters.AddWithValue(normalizedParameterName, x) |> ignore
+            | SqlValue.Jsonb x -> add x NpgsqlDbType.Jsonb
+            | SqlValue.Time x -> add x NpgsqlDbType.Time
+            | SqlValue.StringArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Text)
+            | SqlValue.IntArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Integer)
+            | SqlValue.Parameter x -> cmd.Parameters.AddWithValue(normalizedParameterName, x) |> ignore
 
     let private populateCmd (cmd: NpgsqlCommand) (props: SqlProps) =
         if props.IsFunction then cmd.CommandType <- CommandType.StoredProcedure

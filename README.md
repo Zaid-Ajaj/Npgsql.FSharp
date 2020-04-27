@@ -164,3 +164,50 @@ let users =
         })
 ```
 Note in this example, when we write `use connection = ...` it means the connection will be disposed at the end of the scopre where this value is bound, not internally from the `Sql` module.
+
+### Reading values from the `NpgsqlDataReader`
+When running the `Sql.execute` function, you can read values directly from the `NpgsqlDataReader` as opposed to using the provided `RowReader`. Instead of writing this:
+```fs
+let getAllUsers() : Result<User list, exn> =
+    defaultConnection
+    |> Sql.connectFromConfig
+    |> Sql.query "SELECT * FROM users"
+    |> Sql.execute (fun read ->
+        {
+            Id = read.int "user_id"
+            FirstName = read.text "first_name"
+            LastName = read.textOrNone "last_name" // reading nullable column
+        })
+```
+You write 
+```fs
+let getAllUsers() : Result<User list, exn> =
+    defaultConnection
+    |> Sql.connectFromConfig
+    |> Sql.query "SELECT * FROM users"
+    |> Sql.execute (fun read ->
+        {
+            Id = read.NpgsqlReader.GetInt32(read.NpgsqlReader.GetOrdinal("user_id"))
+            FirstName = read.NpgsqlReader.GetString(read.NpgsqlReader.GetOrdinal("first_name"))
+            LastName = read.textOrNone "last_name" // reading nullable column
+        })
+```
+Here we are using the `NpgsqlReader` property from the `RowReader` which allows you to read or convert custom values. Usually you don't need this unless when you are using custom type handlers for the `NpgsqlConnection`.
+
+### Custom parameters with `NpgsqlParameter`
+
+When the built-in parameter constructors aren't enough for you (for example when you are using type handler plugins) then you can use the generic `Sql.parameter` function to provide one:
+```fs
+let customParameter = new NpgsqlParameter(...)
+
+defaultConnection
+|> Sql.connectFromConfig
+|> Sql.query "SELECT * FROM users"
+|> Sql.parameters [ "username", Sql.parameter customParameter ]
+|> Sql.execute (fun read ->
+    {
+        Id = read.int "user_id"
+        FirstName = read.text "first_name"
+        LastName = read.textOrNone "last_name" // reading nullable column
+    })
+```
