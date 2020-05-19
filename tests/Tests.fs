@@ -120,6 +120,99 @@ let tests =
                 | Ok users -> Expect.equal users expected "Users can be read correctly"
             }
 
+            test "Sql.executeRow works" {
+                use db = buildDatabase()
+                db.ConnectionString
+                |> Sql.connect
+                |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null)"
+                |> Sql.executeNonQuery
+                |> ignore
+
+                db.ConnectionString
+                |> Sql.connect
+                |> Sql.query "SELECT COUNT(*) as user_count FROM users"
+                |> Sql.executeRow (fun read -> read.int64 "user_count")
+                |> function 
+                     | Ok count -> Expect.equal count 0L "Count is zero"
+                     | Error err -> raise err
+            }
+
+            test "Sql.iter works" {
+                use db = buildDatabase()
+                db.ConnectionString
+                |> Sql.connect
+                |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null)"
+                |> Sql.executeNonQuery
+                |> ignore
+
+                let mutable count = -1
+                db.ConnectionString
+                |> Sql.connect
+                |> Sql.query "SELECT COUNT(*) as user_count FROM users"
+                |> Sql.iter (fun read -> count <- read.int "user_count")
+                |> function 
+                    | Ok() -> Expect.equal count 0 "The count is zero"
+                    | Error err -> raise err
+            }
+
+            testAsync "Sql.iterAsync works" {
+                use db = buildDatabase()
+                db.ConnectionString
+                |> Sql.connect
+                |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null)"
+                |> Sql.executeNonQuery
+                |> ignore
+
+                let mutable count = -1
+
+                let! result = 
+                    db.ConnectionString
+                    |> Sql.connect
+                    |> Sql.query "SELECT COUNT(*) as user_count FROM users"
+                    |> Sql.iterAsync (fun read -> count <- read.int "user_count")
+
+                match result with 
+                | Ok() -> Expect.equal count 0 "The count is zero"
+                | Error err -> raise err
+            }
+
+
+            test "Reading count as int works" {
+                use db = buildDatabase()
+                db.ConnectionString
+                |> Sql.connect
+                |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null)"
+                |> Sql.executeNonQuery
+                |> ignore
+
+                db.ConnectionString
+                |> Sql.connect
+                |> Sql.query "SELECT COUNT(*) as user_count FROM users"
+                |> Sql.executeRow (fun read -> read.int "user_count")
+                |> function 
+                     | Ok count -> Expect.equal count 0 "Count is zero"
+                     | Error err -> raise err
+            }
+
+            testAsync "Sql.executeRowAsync works" {
+                use db = buildDatabase()
+                db.ConnectionString
+                |> Sql.connect
+                |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null)"
+                |> Sql.executeNonQuery
+                |> ignore
+
+                let! content =  
+                    db.ConnectionString
+                    |> Sql.connect
+                    |> Sql.query "SELECT COUNT(*) as user_count FROM users"
+                    |> Sql.executeRowAsync (fun read -> read.int64 "user_count")
+                
+                match content with
+                | Ok count -> Expect.equal count 0L "Count is zero"
+                | Error err -> raise err
+            }
+
             test "Sql.executeTransaction works with existing open connection" {
                 use db = buildDatabase()
                 use connection = new NpgsqlConnection(db.ConnectionString)

@@ -7,11 +7,11 @@
     <PackageIconUrl></PackageIconUrl>
     <PackageTags>fsharp;postgres;sql;ngpsql</PackageTags>
     <Authors>Zaid Ajaj</Authors>
-    <Version>3.3.0</Version>
-    <TargetFrameworks>netstandard2.0;net461;netcoreapp3.0</TargetFrameworks>
+    <Version>3.4.0</Version>
+    <TargetFrameworks>netstandard2.0;net461;netcoreapp3.0;netcoreapp3.1</TargetFrameworks>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <LangVersion>latest</LangVersion>
-    <PackageReleaseNotes>Ability to add custom types of parameters via Sql.parameter</PackageReleaseNotes>
+    <PackageReleaseNotes>Added Sql.executeRow(Async) and Sql.iter(Async)</PackageReleaseNotes>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="OptionWorkflow.fs" />

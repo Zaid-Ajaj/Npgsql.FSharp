@@ -629,6 +629,49 @@ module Sql =
         with error ->
             Error error
 
+    let iter (perform: RowReader -> unit) (props: SqlProps) : Result<unit, exn> =
+        try
+            if List.isEmpty props.SqlQuery then failwith "No query provided to execute. Please use Sql.query"
+            let connection = getConnection props
+            try
+                if not (connection.State.HasFlag ConnectionState.Open)
+                then connection.Open()
+                use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
+                do populateCmd command props
+                if props.NeedPrepare then command.Prepare()
+                use reader = command.ExecuteReader()
+                let postgresReader = unbox<NpgsqlDataReader> reader
+                let rowReader = RowReader(postgresReader)
+                while reader.Read() do perform rowReader
+                Ok ()
+            finally
+                if props.ExistingConnection.IsNone
+                then connection.Dispose()
+        with error ->
+            Error error
+
+    let executeRow (read: RowReader -> 't) (props: SqlProps) : Result<'t, exn> =
+        try
+            if List.isEmpty props.SqlQuery then failwith "No query provided to execute. Please use Sql.query"
+            let connection = getConnection props
+            try
+                if not (connection.State.HasFlag ConnectionState.Open)
+                then connection.Open()
+                use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
+                do populateCmd command props
+                if props.NeedPrepare then command.Prepare()
+                use reader = command.ExecuteReader()
+                let postgresReader = unbox<NpgsqlDataReader> reader
+                let rowReader = RowReader(postgresReader)
+                if reader.Read() 
+                then Ok (read rowReader)
+                else failwith "Expected at least one row to be returned from the result set. Instead it was empty"
+            finally
+                if props.ExistingConnection.IsNone
+                then connection.Dispose()
+        with error ->
+            Error error
+
     let executeAsync (read: RowReader -> 't) (props: SqlProps) : Async<Result<'t list, exn>> =
         async {
             try
@@ -649,6 +692,59 @@ module Sql =
                     let result = ResizeArray<'t>()
                     while reader.Read() do result.Add (read rowReader)
                     return Ok (List.ofSeq result)
+                finally
+                    if props.ExistingConnection.IsNone
+                    then connection.Dispose()
+            with error ->
+                return Error error
+        }
+
+    let iterAsync (perform: RowReader -> unit) (props: SqlProps) : Async<Result<unit, exn>> =
+        async {
+            try
+                let! token =  Async.CancellationToken
+                use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
+                let mergedToken = mergedTokenSource.Token
+                if List.isEmpty props.SqlQuery then failwith "No query provided to execute. Please use Sql.query"
+                let connection = getConnection props
+                try
+                    if not (connection.State.HasFlag ConnectionState.Open)
+                    then do! Async.AwaitTask(connection.OpenAsync(mergedToken))
+                    use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
+                    do populateCmd command props
+                    if props.NeedPrepare then command.Prepare()
+                    use! reader = Async.AwaitTask (command.ExecuteReaderAsync(mergedToken))
+                    let postgresReader = unbox<NpgsqlDataReader> reader
+                    let rowReader = RowReader(postgresReader)
+                    while reader.Read() do perform rowReader
+                    return Ok ()
+                finally
+                    if props.ExistingConnection.IsNone
+                    then connection.Dispose()
+            with error ->
+                return Error error
+        }
+
+    let executeRowAsync (read: RowReader -> 't) (props: SqlProps) : Async<Result<'t, exn>> =
+        async {
+            try
+                let! token =  Async.CancellationToken
+                use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
+                let mergedToken = mergedTokenSource.Token
+                if List.isEmpty props.SqlQuery then failwith "No query provided to execute. Please use Sql.query"
+                let connection = getConnection props
+                try
+                    if not (connection.State.HasFlag ConnectionState.Open)
+                    then do! Async.AwaitTask(connection.OpenAsync(mergedToken))
+                    use command = new NpgsqlCommand(List.head props.SqlQuery, connection)
+                    do populateCmd command props
+                    if props.NeedPrepare then command.Prepare()
+                    use! reader = Async.AwaitTask (command.ExecuteReaderAsync(mergedToken))
+                    let postgresReader = unbox<NpgsqlDataReader> reader
+                    let rowReader = RowReader(postgresReader)
+                    if reader.Read() 
+                    then return Ok (read rowReader)
+                    else return! failwith "Expected at least one row to be returned from the result set. Instead it was empty"
                 finally
                     if props.ExistingConnection.IsNone
                     then connection.Dispose()
