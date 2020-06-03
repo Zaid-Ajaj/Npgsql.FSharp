@@ -194,6 +194,29 @@ let tests =
                      | Error err -> raise err
             }
 
+            test "Paramater names can contain trailing spaces" {
+                use db = buildDatabase()
+                use connection = new NpgsqlConnection(db.ConnectionString)
+                connection.Open()
+                Sql.existingConnection connection
+                |> Sql.query "CREATE TABLE test (test_id serial primary key, integers int [])"
+                |> Sql.executeNonQuery
+                |> ignore
+
+
+                let result =
+                    Sql.existingConnection connection
+                    |> Sql.executeTransaction [
+                        "INSERT INTO test (integers) VALUES (@integers)", [
+                            [ ("@integers        ", Sql.intArray [| 1; 3; 7; |] ) ]
+                            [ ("    @integers"    , Sql.intArray [| 1; 3; 7; |] ) ]
+                            [ ("   integers      ", Sql.intArray [| 1; 3; 7; |] ) ]
+                        ]
+                    ]
+
+                Expect.equal result (Ok [1; 1; 1;]) "paramaters can contain trailing spaces"
+            }
+
             testAsync "Sql.executeRowAsync works" {
                 use db = buildDatabase()
                 db.ConnectionString

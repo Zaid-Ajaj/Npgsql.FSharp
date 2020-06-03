@@ -504,6 +504,7 @@ module Sql =
         for (paramName, value) in row do
             
             let normalizedParameterName =
+                let paramName = paramName.Trim()
                 if not (paramName.StartsWith "@")
                 then sprintf "@%s" paramName
                 else paramName
