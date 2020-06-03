@@ -209,10 +209,12 @@ let tests =
                     |> Sql.executeTransaction [
                         "INSERT INTO test (integers) VALUES (@integers)", [
                             [ ("@integers        ", Sql.intArray [| 1; 3; 7; |] ) ]
+                            [ ("    @integers"    , Sql.intArray [| 1; 3; 7; |] ) ]
+                            [ ("   integers      ", Sql.intArray [| 1; 3; 7; |] ) ]
                         ]
                     ]
 
-                Expect.equal result (Ok [1]) "paramaters can contain trailing spaces"
+                Expect.equal result (Ok [1; 1; 1;]) "paramaters can contain trailing spaces"
             }
 
             testAsync "Sql.executeRowAsync works" {
