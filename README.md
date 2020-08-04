@@ -120,6 +120,24 @@ let getAllUsers() : Async<Result<User list, exn>> =
         })
 ```
 
+### Insert or update in a single transaction:
+```fs
+connectionString
+|> Sql.connect
+|> Sql.executeTransaction // SqlProps -> int list
+    [
+        "INSERT INTO customers (name, age) VALUES (@name, @age)", [
+            [ "@name", Sql.string "John"
+              "@age", Sql.int 69 ]
+        ]
+
+        "UPDATE customers SET age = @age WHERE name = @name",  [
+            [ "@name", Sql.string "John"
+              "@age", Sql.int 69 ]
+        ]
+   ]
+```
+
 ### Execute multiple inserts or updates in a single transaction:
 ```fs
 connectionString
@@ -137,6 +155,7 @@ connectionString
         ]
    ]
 ```
+
 ### Returns number of affected rows from statement
 Use the function `Sql.executeNonQuery` or its async counter part to get the number of affected rows from a query. Like always, the function is safe by default and returns `Result<int, exn>` as output.
 ```fs
@@ -147,7 +166,7 @@ let getAllUsers() : Result<int, exn> =
     |> Sql.parameters [ "is_active", Sql.bit false ]
     |> Sql.executeNonQuery
 ```
-### Use an existing connections
+### Use an existing connection
 Sometimes, you already have constructed a `NpgsqlConnection` and want to use with the `Sql` module. You can use the function `Sql.existingConnection` which takes a preconfigured connection from which the queries or transactions are executed. Note that this library will *open the connection* if it is not already open and it will leave the connection open (deos not dispose of it) when it finishes running. This means that you have to manage the disposal of the connection yourself:
 ```fs
 use connection = new NpgsqlConnection("YOUR CONNECTION STRING")
