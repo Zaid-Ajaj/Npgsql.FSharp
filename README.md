@@ -49,7 +49,6 @@ However, `Sql.connectFromConfig` takes the connection string *builder* if you ar
 The main function to execute queries and return a list of a results is `Sql.execute`:
 ```fs
 open Npgsql.FSharp
-open Npgsql.FSharp.OptionWorkflow
 
 type User = {
     Id: int
@@ -168,13 +167,13 @@ let getAllUsers() : Result<int, exn> =
 The functions `Sql.execute` and `Sql.executeAsync` by default return you a `list<'t>` type which for many cases works quite well. However, for really large datasets (> 100K of rows) using F# lists might not be ideal for performance. This library provides the function `Sql.iter` which allows you to *do* something with the row reader like adding rows to `ResizeArray<'t>` as follows without using an intermediate F# `list<'t>`:
 ```fs
 let filmTitles(connectionString: string) =
-    let names = ResizeArray<string>()
+    let titles = ResizeArray<string>()
     connectionString
     |> Sql.connect
     |> Sql.query "SELECT title FROM film"
-    |> Sql.iter (fun read -> filmTitles.Add(read.text "title"))
+    |> Sql.iter (fun read -> titles.Add(read.text "title"))
     |> function
-        | Ok() -> Ok filmTitles
+        | Ok() -> Ok titles
         | Error error -> Error error
 ```
 ### Use an existing connections
