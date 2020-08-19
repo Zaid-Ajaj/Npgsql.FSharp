@@ -45,7 +45,7 @@ However, `Sql.connectFromConfig` takes the connection string *builder* if you ar
 
 `Sql.connectFromConfig config` is just `Sql.connect (Sql.formatConnectionString config)`
 
-### Execute query and read results as table then map the results
+### `Sql.execute`: Execute query and read results as table then map the results
 The main function to execute queries and return a list of a results is `Sql.execute`:
 ```fs
 open Npgsql.FSharp
@@ -68,7 +68,7 @@ let getAllUsers() : Result<User list, exn> =
             LastName = read.text "last_name"
         })
 ```
-The function is *always* safe and will return you `Result<'t, exn>` from the execution.
+The function is *always* safe and will return you `Result<'t list, exn>` from the execution.
 
 ### Deal with null values and provide defaults
 Notice the `LastName` field becomes `string option` instead of `string`
@@ -90,7 +90,9 @@ let getAllUsers() : Result<User list, exn> =
             LastName = read.textOrNone "last_name" // reading nullable column
         })
 ```
+Then you can use `defaultArg` or other functions from the `Option` to provide default values when needed.
 ### Make the reading async using `Sql.executeAsync`
+The exact definition is used, except that `Sql.execute` becomes `Sql.executeAsync`
 ```fsharp
 let getAllUsers() : Async<Result<User list, exn>> =
     defaultConnection
@@ -104,7 +106,7 @@ let getAllUsers() : Async<Result<User list, exn>> =
         })
 ```
 
-### Parameterized queries
+### `Sql.parameters`: Parameterized queries
 Provide parameters using the `Sql.parameters` function as a list of tuples. When using the analyzer, make sure you use functions from `Sql` module to initialize the values so that the analyzer can type-check them against the types of the required parameters.
 ```fs
 let getAllUsers() : Async<Result<User list, exn>> =
@@ -119,44 +121,39 @@ let getAllUsers() : Async<Result<User list, exn>> =
             LastName = read.textOrNone "last_name"
         })
 ```
-
-### Insert or update in a single transaction:
+### `Sql.executeSingleRow`: Execute a query and read a single row back
+Use the function `Sql.executeRow` or its async counter part to read a single row of the output result. For example, to read the number of rows from a table:
 ```fs
-connectionString
-|> Sql.connect
-|> Sql.executeTransaction // SqlProps -> int list
-    [
-        "INSERT INTO customers (name, age) VALUES (@name, @age)", [
-            [ "@name", Sql.string "John"
-              "@age", Sql.int 69 ]
-        ]
-
-        "UPDATE customers SET age = @age WHERE name = @name",  [
-            [ "@name", Sql.string "John"
-              "@age", Sql.int 69 ]
-        ]
-   ]
+let numberOfUsers() : Result<int64, exn> =
+    defaultConnection
+    |> Sql.connectFromConfig
+    |> Sql.query "SELECT COUNT(*) as user_count FROM users"
+    |> Sql.executeSingleRow (fun read -> read.int64 "user_count")
 ```
+> Notice here we alias the result of `COUNT(*)` as a column named `user_count`. This is recommended when reading scalar result sets so that we work against a named column instead of its index.
 
-### Execute multiple inserts or updates in a single transaction:
+### `Sql.executeTransaction`: Execute multiple inserts or updates in a single transaction
+Both queries in the example below are executed within a single transaction and if one of them fails, the entire transaction is rolled back.
 ```fs
 connectionString
 |> Sql.connect
-|> Sql.executeTransaction // SqlProps -> int list
+|> Sql.executeTransaction
     [
+        // This query is executed 3 times
+        // using three different set of parameters
         "INSERT INTO ... VALUES (@number)", [
             [ "@number", Sql.int 1 ]
             [ "@number", Sql.int 2 ]
             [ "@number", Sql.int 3 ]
         ]
 
+        // This query is executed once
         "UPDATE ... SET meta = @meta",  [
            [ "@meta", Sql.text value ]
         ]
    ]
 ```
-
-### Returns number of affected rows from statement
+### `Sql.executeNonQuery`: Returns number of affected rows from statement
 Use the function `Sql.executeNonQuery` or its async counter part to get the number of affected rows from a query. Like always, the function is safe by default and returns `Result<int, exn>` as output.
 ```fs
 let getAllUsers() : Result<int, exn> =
@@ -166,7 +163,21 @@ let getAllUsers() : Result<int, exn> =
     |> Sql.parameters [ "is_active", Sql.bit false ]
     |> Sql.executeNonQuery
 ```
-### Use an existing connection
+
+### `Sql.iter`: Iterating through the result set
+The functions `Sql.execute` and `Sql.executeAsync` by default return you a `list<'t>` type which for many cases works quite well. However, for really large datasets (> 100K of rows) using F# lists might not be ideal for performance. This library provides the function `Sql.iter` which allows you to *do* something with the row reader like adding rows to `ResizeArray<'t>` as follows without using an intermediate F# `list<'t>`:
+```fs
+let filmTitles(connectionString: string) =
+    let names = ResizeArray<string>()
+    connectionString
+    |> Sql.connect
+    |> Sql.query "SELECT title FROM film"
+    |> Sql.iter (fun read -> filmTitles.Add(read.text "title"))
+    |> function
+        | Ok() -> Ok filmTitles
+        | Error error -> Error error
+```
+### Use an existing connections
 Sometimes, you already have constructed a `NpgsqlConnection` and want to use with the `Sql` module. You can use the function `Sql.existingConnection` which takes a preconfigured connection from which the queries or transactions are executed. Note that this library will *open the connection* if it is not already open and it will leave the connection open (deos not dispose of it) when it finishes running. This means that you have to manage the disposal of the connection yourself:
 ```fs
 use connection = new NpgsqlConnection("YOUR CONNECTION STRING")
@@ -184,7 +195,7 @@ let users =
 ```
 Note in this example, when we write `use connection = ...` it means the connection will be disposed at the end of the scopre where this value is bound, not internally from the `Sql` module.
 
-### Reading values from the `NpgsqlDataReader`
+### Reading values from the underlying `NpgsqlDataReader`
 When running the `Sql.execute` function, you can read values directly from the `NpgsqlDataReader` as opposed to using the provided `RowReader`. Instead of writing this:
 ```fs
 let getAllUsers() : Result<User list, exn> =
@@ -198,7 +209,7 @@ let getAllUsers() : Result<User list, exn> =
             LastName = read.textOrNone "last_name" // reading nullable column
         })
 ```
-You write 
+You write
 ```fs
 let getAllUsers() : Result<User list, exn> =
     defaultConnection
