@@ -192,7 +192,7 @@ let users =
             FirstName = read.text "first_name"
         })
 ```
-Note in this example, when we write `use connection = ...` it means the connection will be disposed at the end of the scopre where this value is bound, not internally from the `Sql` module.
+Note in this example, when we write `use connection = ...` it means the connection will be disposed at the end of the scope where this value is bound, not internally from the `Sql` module.
 
 ### Reading values from the underlying `NpgsqlDataReader`
 When running the `Sql.execute` function, you can read values directly from the `NpgsqlDataReader` as opposed to using the provided `RowReader`. Instead of writing this:
