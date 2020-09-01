@@ -120,14 +120,14 @@ let getAllUsers() : Async<Result<User list, exn>> =
             LastName = read.textOrNone "last_name"
         })
 ```
-### `Sql.executeSingleRow`: Execute a query and read a single row back
+### `Sql.executeRow`: Execute a query and read a single row back
 Use the function `Sql.executeRow` or its async counter part to read a single row of the output result. For example, to read the number of rows from a table:
 ```fs
 let numberOfUsers() : Result<int64, exn> =
     defaultConnection
     |> Sql.connectFromConfig
     |> Sql.query "SELECT COUNT(*) as user_count FROM users"
-    |> Sql.executeSingleRow (fun read -> read.int64 "user_count")
+    |> Sql.executeRow (fun read -> read.int64 "user_count")
 ```
 > Notice here we alias the result of `COUNT(*)` as a column named `user_count`. This is recommended when reading scalar result sets so that we work against a named column instead of its index.
 
