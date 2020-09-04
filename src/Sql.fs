@@ -26,7 +26,7 @@ type Sql() =
     static member stringOrNone(value: string option) = Utils.sqlMap value Sql.string
     static member text(value: string) = SqlValue.String value
     static member textOrNone(value: string option) = Sql.stringOrNone value
-    static member jsonb(value: string) = SqlValue.Jsonb value 
+    static member jsonb(value: string) = SqlValue.Jsonb value
     static member jsonbOrNone(value: string option) = Utils.sqlMap value Sql.jsonb
     static member bit(value: bool) = SqlValue.Bit value
     static member bitOrNone(value: bool option) = Utils.sqlMap value Sql.bit
@@ -60,8 +60,8 @@ type Sql() =
     static member intArrayOrNone(value: int[] option) = Utils.sqlMap value Sql.intArray
     static member dbnull = SqlValue.Null
     static member parameter(genericParameter: NpgsqlParameter) = SqlValue.Parameter genericParameter
-     
-/// Specifies how to manage SSL. 
+
+/// Specifies how to manage SSL.
 [<RequireQualifiedAccess>]
 type SslMode =
     /// SSL is disabled. If the server requires SSL, the connection will fail.
@@ -399,7 +399,11 @@ module Sql =
         ExistingConnection = None
     }
 
-    let connect constr  = { defaultProps() with ConnectionString = constr }
+    let connect (constr: string) =
+        if Uri.IsWellFormedUriString(constr, UriKind.Absolute) && constr.StartsWith "postgres://"
+        then { defaultProps() with ConnectionString = Uri(constr).ToPostgresConnectionString() }
+        else { defaultProps() with ConnectionString = constr }
+
     let clientCertificate cert props = { props with ClientCertificate = Some cert }
     let host x = { defaultConString() with Host = x }
     let username username config = { config with Username = Some username }
@@ -409,6 +413,8 @@ module Sql =
     let database x con = { con with Database = x }
     /// Specifies how to manage SSL Mode.
     let sslMode mode config = { config with SslMode = Some mode }
+    let requireSslMode config = { config with SslMode = Some SslMode.Require }
+
     let cancellationToken token config = { config with CancellationToken = token }
     /// Specifies the port of the database server. If you don't specify the port, the default port of `5432` is used.
     let port port config = { config with Port = Some port }
@@ -482,10 +488,14 @@ module Sql =
         ||> List.fold updateConfig
 
     let existingConnection (connection: NpgsqlConnection) = { defaultProps() with ExistingConnection = connection |> Option.ofObj }
+    /// Configures the SQL query to execute
     let query (sql: string) props = { props with SqlQuery = [sql] }
     let func (sql: string) props = { props with SqlQuery = [sql]; IsFunction = true }
-    let prepare  props = { props with NeedPrepare = true}
+    let prepare  props = { props with NeedPrepare = true }
+    /// Provides the SQL parameters for the query
     let parameters ls props = { props with Parameters = ls }
+    /// When using the Npgsql.FSharp.Analyzer, this function annotates the code to tell the analyzer to ignore and skip the SQL analyzer against the database.
+    let skipAnalysis (props: SqlProps) = props
     let private newConnection (props: SqlProps): NpgsqlConnection =
         let connection = new NpgsqlConnection(props.ConnectionString)
         match props.ClientCertificate with
@@ -502,14 +512,14 @@ module Sql =
 
     let private populateRow (cmd: NpgsqlCommand) (row: (string * SqlValue) list) =
         for (paramName, value) in row do
-            
+
             let normalizedParameterName =
                 let paramName = paramName.Trim()
                 if not (paramName.StartsWith "@")
                 then sprintf "@%s" paramName
                 else paramName
 
-            let add value valueType = 
+            let add value valueType =
                 cmd.Parameters.AddWithValue(normalizedParameterName, valueType, value)
                 |> ignore
 
@@ -666,7 +676,7 @@ module Sql =
                 use reader = command.ExecuteReader()
                 let postgresReader = unbox<NpgsqlDataReader> reader
                 let rowReader = RowReader(postgresReader)
-                if reader.Read() 
+                if reader.Read()
                 then Ok (read rowReader)
                 else failwith "Expected at least one row to be returned from the result set. Instead it was empty"
             finally
@@ -745,7 +755,7 @@ module Sql =
                     use! reader = Async.AwaitTask (command.ExecuteReaderAsync(mergedToken))
                     let postgresReader = unbox<NpgsqlDataReader> reader
                     let rowReader = RowReader(postgresReader)
-                    if reader.Read() 
+                    if reader.Read()
                     then return Ok (read rowReader)
                     else return! failwith "Expected at least one row to be returned from the result set. Instead it was empty"
                 finally
