@@ -60,6 +60,7 @@ type Sql() =
     static member intArrayOrNone(value: int[] option) = Utils.sqlMap value Sql.intArray
     static member dbnull = SqlValue.Null
     static member parameter(genericParameter: NpgsqlParameter) = SqlValue.Parameter genericParameter
+    static member point(value: NpgsqlPoint) = SqlValue.Point value
 
 /// Specifies how to manage SSL.
 [<RequireQualifiedAccess>]
@@ -351,6 +352,21 @@ type RowReader(reader: NpgsqlDataReader) =
             else Some (reader.GetFloat(columnIndex))
         | false, _ -> failToRead column "float"
 
+    /// Gets the value of the specified column as an `NpgsqlTypes.NpgsqlPoint`
+    member this.point(column: string) : NpgsqlPoint =
+        match columnDict.TryGetValue(column) with
+        | true, columnIndex -> reader.GetFieldValue<NpgsqlPoint>(columnIndex)
+        | false, _ -> failToRead column "npgsqlpoint"
+
+    /// Gets the value of the specified column as an `NpgsqlTypes.NpgsqlPoint`
+    member this.pointOrNone(column: string) : NpgsqlPoint option =
+        match columnDict.TryGetValue(column) with
+        | true, columnIndex ->
+            if reader.IsDBNull(columnIndex)
+            then None
+            else Some (reader.GetFieldValue<NpgsqlPoint>(columnIndex))
+        | false, _ -> failToRead column "npgsqlpoint"
+
 [<RequireQualifiedAccess>]
 module Sql =
     type ConnectionStringBuilder = private {
@@ -546,6 +562,7 @@ module Sql =
             | SqlValue.StringArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Text)
             | SqlValue.IntArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Integer)
             | SqlValue.Parameter x -> cmd.Parameters.AddWithValue(normalizedParameterName, x) |> ignore
+            | SqlValue.Point x -> add x NpgsqlDbType.Point
 
     let private populateCmd (cmd: NpgsqlCommand) (props: SqlProps) =
         if props.IsFunction then cmd.CommandType <- CommandType.StoredProcedure
