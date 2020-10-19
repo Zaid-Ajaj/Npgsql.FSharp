@@ -32,6 +32,16 @@ type UuidArrayTest = {
     guids: Guid array
 }
 
+type PointTest = {
+    id: int
+    point: NpgsqlTypes.NpgsqlPoint
+}
+
+type NullablePointTest = {
+    id: int
+    nullablepoint: NpgsqlTypes.NpgsqlPoint option
+}
+
 let buildDatabaseConnection handleInfinity : ThrowawayDatabase =
     let createFSharpTable = "create table if not exists fsharp_test (test_id int, test_name text)"
     let createJsonbTable = "create table if not exists data_with_jsonb (data jsonb)"
@@ -40,6 +50,7 @@ let buildDatabaseConnection handleInfinity : ThrowawayDatabase =
     let createStringArrayTable = "create table if not exists string_array_test (id int, values text [])"
     let createUuidArrayTable = "create table if not exists uuid_array_test (id int, values uuid [])"
     let createIntArrayTable = "create table if not exists int_array_test (id int, integers int [])"
+    let createPointTable = "create table if not exists point_test (id int, test_point point)"
     let createExtensionHStore = "create extension if not exists hstore"
     let createExtensionUuid = "create extension if not exists \"uuid-ossp\""
 
@@ -72,6 +83,7 @@ let buildDatabaseConnection handleInfinity : ThrowawayDatabase =
         createIntArrayTable, [ ]
         createExtensionUuid, [ ]
         createUuidArrayTable, []
+        createPointTable, []
     ]
     |> ignore
 
@@ -983,6 +995,85 @@ let tests =
                 match table with
                 | Error error -> raise error
                 | Ok values -> Expect.equal expected values "All rows from `uuid_array_test` table"
+            }
+
+            test "Handle NpgsqlPoint" {
+                let a = NpgsqlTypes.NpgsqlPoint(10., 20.)
+                let b = NpgsqlTypes.NpgsqlPoint(55.234, 7.2134)
+                let c = NpgsqlTypes.NpgsqlPoint(28.00843, 24.2345)
+                let seedDatabase (connection: string) =
+                    connection
+                    |> Sql.connect
+                    |> Sql.executeTransaction [
+                        "INSERT INTO point_test (id, test_point) values (@id, @point)", [
+                            [ "@id", Sql.int 1; "@point", Sql.point a ]
+                            [ "@id", Sql.int 2; "@point", Sql.point b ]
+                            [ "@id", Sql.int 3; "@point", Sql.point c ]
+                        ]
+                    ]
+                    |> ignore
+
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
+                seedDatabase connection
+
+                let table =
+                    connection
+                    |> Sql.connect
+                    |> Sql.query "SELECT * FROM point_test"
+                    |> Sql.execute (fun read -> {
+                        id = read.int "id"
+                        point = read.point "test_point"
+                    })
+
+                let expected = [
+                    { id = 1; point = a}
+                    { id = 2; point = b}
+                    { id = 3; point = c}
+                ]
+
+                match table with
+                | Error error -> raise error
+                | Ok values -> Expect.equal expected values "All rows from `point_test` table"
+            }
+
+            test "Handle nullable NpgsqlPoint" {
+                let a = NpgsqlTypes.NpgsqlPoint(10., 20.)
+                let b = NpgsqlTypes.NpgsqlPoint(55.234, 7.2134)
+                let seedDatabase (connection: string) =
+                    connection
+                    |> Sql.connect
+                    |> Sql.executeTransaction [
+                        "INSERT INTO point_test (id, test_point) values (@id, @point)", [
+                            [ "@id", Sql.int 1; "@point", Sql.point a ]
+                            [ "@id", Sql.int 2; "@point", Sql.point b ]
+                            [ "@id", Sql.int 3; "@point", Sql.dbnull ]
+                        ]
+                    ]
+                    |> ignore
+
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
+                seedDatabase connection
+
+                let table =
+                    connection
+                    |> Sql.connect
+                    |> Sql.query "SELECT * FROM point_test"
+                    |> Sql.execute (fun read -> {
+                        id = read.int "id"
+                        nullablepoint = read.pointOrNone "test_point"
+                    })
+
+                let expected = [
+                    { id = 1; nullablepoint = Some a }
+                    { id = 2; nullablepoint = Some b }
+                    { id = 3; nullablepoint = None }
+                ]
+
+                match table with
+                | Error error -> raise error
+                | Ok values -> Expect.equal expected values "All rows from `point_test` table"
             }
         ] |> testSequenced
 

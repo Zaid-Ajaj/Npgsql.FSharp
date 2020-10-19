@@ -2,10 +2,11 @@ namespace Npgsql.FSharp
 
 open System
 open Npgsql
+open NpgsqlTypes
 
 [<RequireQualifiedAccess>]
 type SqlValue =
-    | Parameter of NpgsqlParameter 
+    | Parameter of NpgsqlParameter
     | Null
     | TinyInt of int8
     | Short of int16
@@ -27,3 +28,4 @@ type SqlValue =
     | Jsonb of string
     | StringArray of string array
     | IntArray of int array
+    | Point of NpgsqlPoint
