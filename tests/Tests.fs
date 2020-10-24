@@ -1110,7 +1110,24 @@ let missingQueryTests =
                         "Check missing query fails with expected exception type"
                 })
 
-let errorTests =  testList "Custom Exception tests" missingQueryTests
+let noResultsTests =
+    [ "Sql.executeRow", testable <| Sql.executeRow dummyRead
+      "Sql.executeRowAsync", asyncTestable <| Sql.executeRowAsync dummyRead]
+    |> List.map
+        (fun (name, func) ->
+            test (sprintf "%s fails with NoResultsException if no results are returned" name) {
+                use db = buildDatabase()
+
+                Expect.throwsT<Sql.NoResultsException>
+                    (fun () ->
+                         db.ConnectionString
+                         |> Sql.connect
+                         |> Sql.query "SELECT * FROM fsharp_test WHERE test_id = 9999"
+                         |> func)
+                    "Check no results fails with NoResultsException"
+           })
+
+let errorTests =  testList "Custom Exception tests" ( missingQueryTests@noResultsTests )
 let allTests = testList "All tests" [ tests; errorTests ]
 
 [<EntryPoint>]

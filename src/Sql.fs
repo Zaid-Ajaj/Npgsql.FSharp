@@ -393,6 +393,7 @@ module Sql =
     }
 
     exception MissingQueryException of string
+    exception NoResultsException of string
 
     let private defaultConString() : ConnectionStringBuilder = {
         Host = ""
@@ -700,7 +701,7 @@ module Sql =
                 let rowReader = RowReader(postgresReader)
                 if reader.Read()
                 then Ok (read rowReader)
-                else failwith "Expected at least one row to be returned from the result set. Instead it was empty"
+                else raise <| NoResultsException "Expected at least one row to be returned from the result set. Instead it was empty"
             finally
                 if props.ExistingConnection.IsNone
                 then connection.Dispose()
@@ -782,7 +783,7 @@ module Sql =
                     let rowReader = RowReader(postgresReader)
                     if reader.Read()
                     then return Ok (read rowReader)
-                    else return! failwith "Expected at least one row to be returned from the result set. Instead it was empty"
+                    else return! raise <| NoResultsException "Expected at least one row to be returned from the result set. Instead it was empty"
                 finally
                     if props.ExistingConnection.IsNone
                     then connection.Dispose()
