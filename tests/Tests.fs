@@ -144,7 +144,7 @@ let tests =
                 |> Sql.connect
                 |> Sql.query "SELECT COUNT(*) as user_count FROM users"
                 |> Sql.executeRow (fun read -> read.int64 "user_count")
-                |> function 
+                |> function
                      | Ok count -> Expect.equal count 0L "Count is zero"
                      | Error err -> raise err
             }
@@ -162,7 +162,7 @@ let tests =
                 |> Sql.connect
                 |> Sql.query "SELECT COUNT(*) as user_count FROM users"
                 |> Sql.iter (fun read -> count <- read.int "user_count")
-                |> function 
+                |> function
                     | Ok() -> Expect.equal count 0 "The count is zero"
                     | Error err -> raise err
             }
@@ -177,13 +177,13 @@ let tests =
 
                 let mutable count = -1
 
-                let! result = 
+                let! result =
                     db.ConnectionString
                     |> Sql.connect
                     |> Sql.query "SELECT COUNT(*) as user_count FROM users"
                     |> Sql.iterAsync (fun read -> count <- read.int "user_count")
 
-                match result with 
+                match result with
                 | Ok() -> Expect.equal count 0 "The count is zero"
                 | Error err -> raise err
             }
@@ -201,7 +201,7 @@ let tests =
                 |> Sql.connect
                 |> Sql.query "SELECT COUNT(*) as user_count FROM users"
                 |> Sql.executeRow (fun read -> read.int "user_count")
-                |> function 
+                |> function
                      | Ok count -> Expect.equal count 0 "Count is zero"
                      | Error err -> raise err
             }
@@ -237,12 +237,12 @@ let tests =
                 |> Sql.executeNonQuery
                 |> ignore
 
-                let! content =  
+                let! content =
                     db.ConnectionString
                     |> Sql.connect
                     |> Sql.query "SELECT COUNT(*) as user_count FROM users"
                     |> Sql.executeRowAsync (fun read -> read.int64 "user_count")
-                
+
                 match content with
                 | Ok count -> Expect.equal count 0L "Count is zero"
                 | Error err -> raise err
@@ -547,6 +547,36 @@ let tests =
                 |> function
                     | Error error -> raise error
                     | Ok money -> Expect.equal money.[0] 12.5M "Check money as decimal read from database is the same sent"
+            }
+
+            test "DateTimeOffset roundtrip when input is UTC" {
+                use db = buildDatabase()
+
+                let value = DateTimeOffset.UtcNow
+
+                db.ConnectionString
+                |> Sql.connect
+                |> Sql.query "SELECT @timestamp::timestamptz as value"
+                |> Sql.parameters [ "@timestamp", Sql.timestamptz value ]
+                |> Sql.executeRow (fun read -> read.datetimeOffset "value")
+                |> function
+                    | Error error -> raise error
+                    | Ok timestamp -> Expect.equal (timestamp.ToUnixTimeSeconds()) (value.ToUnixTimeSeconds()) "The values are the same"
+            }
+
+            test "DateTimeOffset roundtrip when input is local" {
+                use db = buildDatabase()
+
+                let value = DateTimeOffset.Now
+
+                db.ConnectionString
+                |> Sql.connect
+                |> Sql.query "SELECT @timestamp::timestamptz as value"
+                |> Sql.parameters [ "@timestamp", Sql.timestamptz value ]
+                |> Sql.executeRow (fun read -> read.datetimeOffset "value")
+                |> function
+                    | Error error -> raise error
+                    | Ok timestamp -> Expect.equal (timestamp.ToUnixTimeSeconds()) (value.ToUnixTimeSeconds()) "The values are the same"
             }
 
             test "uuid_generate_v4()" {

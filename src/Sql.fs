@@ -52,6 +52,21 @@ type Sql() =
     static member timestampOrNone(value: DateTime option) = Utils.sqlMap value Sql.timestamp
     static member timestamptz(value: DateTime) = SqlValue.TimestampWithTimeZone value
     static member timestamptzOrNone(value: DateTime option) = Utils.sqlMap value Sql.timestamptz
+    static member timestamptz(value: DateTimeOffset) =
+        let parameter = NpgsqlParameter()
+        parameter.NpgsqlDbType <- NpgsqlDbType.TimestampTz
+        parameter.Value <- value
+        SqlValue.Parameter parameter
+
+    static member timestamptzOrNone(value: DateTimeOffset option) =
+        match value with
+        | None -> SqlValue.Null
+        | Some value ->
+            let parameter = NpgsqlParameter()
+            parameter.NpgsqlDbType <- NpgsqlDbType.TimestampTz
+            parameter.Value <- value
+            SqlValue.Parameter parameter
+
     static member uuid(value: Guid) = SqlValue.Uuid value
     static member uuidOrNone(value: Guid option) = Utils.sqlMap value Sql.uuid
     static member uuidArray(value: Guid []) = SqlValue.UuidArray value
@@ -148,6 +163,30 @@ type RowReader(reader: NpgsqlDataReader) =
             then None
             else Some (reader.GetFieldValue<int[]>(columnIndex))
         | false, _ -> failToRead column "int[]"
+
+    /// Reads the given column of type timestamptz as DateTimeOffset.
+    /// PostgreSQL stores the values of timestamptz as UTC in the database.
+    /// However, when Npgsql reads those values, they are converted to local offset of the machine running this code.
+    /// See https://www.npgsql.org/doc/types/datetime.html#detailed-behavior-reading-values-from-the-database
+    /// This function however, converts it back to UTC the same way it was stored.
+    member this.datetimeOffset(column: string) : DateTimeOffset =
+        match columnDict.TryGetValue(column) with
+        | true, columnIndex -> reader.GetFieldValue<DateTimeOffset>(columnIndex).ToUniversalTime()
+        | false, _ -> failToRead column "DateTimeOffset"
+
+    /// Reads the given column of type timestamptz as DateTimeOffset.
+    /// PostgreSQL stores the values of timestamptz as UTC in the database.
+    /// However, when Npgsql reads those values, they are converted to local offset of the machine running this code.
+    /// See https://www.npgsql.org/doc/types/datetime.html#detailed-behavior-reading-values-from-the-database
+    /// This function however, converts it back to UTC the same way it was stored.
+    member this.datetimeOffsetOrNone(column: string) : DateTimeOffset option =
+        match columnDict.TryGetValue(column) with
+        | true, columnIndex ->
+            if reader.IsDBNull(columnIndex)
+            then None
+            else Some (reader.GetFieldValue<DateTimeOffset>(columnIndex).ToUniversalTime())
+        | false, _ ->
+            failToRead column "DateTimeOffset"
 
     member this.stringArray(column: string) : string[] =
         match columnDict.TryGetValue(column) with
@@ -571,7 +610,9 @@ module Sql =
             | SqlValue.Time x -> add x NpgsqlDbType.Time
             | SqlValue.StringArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Text)
             | SqlValue.IntArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Integer)
-            | SqlValue.Parameter x -> cmd.Parameters.AddWithValue(normalizedParameterName, x) |> ignore
+            | SqlValue.Parameter x ->
+                x.ParameterName <- normalizedParameterName
+                ignore (cmd.Parameters.Add(x))
             | SqlValue.Point x -> add x NpgsqlDbType.Point
 
     let private populateCmd (cmd: NpgsqlCommand) (props: SqlProps) =

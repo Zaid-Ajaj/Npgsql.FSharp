@@ -7,11 +7,11 @@
     <PackageIconUrl></PackageIconUrl>
     <PackageTags>fsharp;postgres;sql;ngpsql</PackageTags>
     <Authors>Zaid Ajaj</Authors>
-    <Version>3.8.0</Version>
+    <Version>3.9.0</Version>
     <TargetFrameworks>netstandard2.0;net461;netcoreapp3.0;netcoreapp3.1</TargetFrameworks>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <LangVersion>latest</LangVersion>
-    <PackageReleaseNotes>Add support for NpgsqlPoint</PackageReleaseNotes>
+    <PackageReleaseNotes>Custom exception types for internal library errors and ability to read/write DateTimeOffset from the reader</PackageReleaseNotes>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="OptionWorkflow.fs" />
