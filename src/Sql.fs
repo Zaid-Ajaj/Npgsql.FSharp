@@ -19,6 +19,10 @@ module Async =
             return f result
         }
 
+exception MissingQueryException of string
+exception NoResultsException of string
+exception UnknownColumnException of string
+
 type Sql() =
     static member int(value: int) = SqlValue.Int value
     static member intOrNone(value: int option) = Utils.sqlMap value Sql.int
@@ -94,7 +98,13 @@ type RowReader(reader: NpgsqlDataReader) =
             |> Seq.map (fun key -> sprintf "[%s:%s]" key columnTypes.[key])
             |> String.concat ", "
 
-        failwithf "Could not read column '%s' as %s. Available columns are %s"  column columnType availableColumns
+        raise
+            <| UnknownColumnException
+                (sprintf
+                     "Could not read column '%s' as %s. Available columns are %s"
+                     column
+                     columnType
+                     availableColumns)
     with
 
     member this.int(column: string) : int =
@@ -639,7 +649,8 @@ module Sql =
 
     let execute (read: RowReader -> 't) (props: SqlProps) : Result<'t list, exn> =
         try
-            if List.isEmpty props.SqlQuery then failwith "No query provided to execute. Please use Sql.query"
+            if List.isEmpty props.SqlQuery
+            then raise <| MissingQueryException "No query provided to execute. Please use Sql.query"
             let connection = getConnection props
             try
                 if not (connection.State.HasFlag ConnectionState.Open)
@@ -661,7 +672,8 @@ module Sql =
 
     let iter (perform: RowReader -> unit) (props: SqlProps) : Result<unit, exn> =
         try
-            if List.isEmpty props.SqlQuery then failwith "No query provided to execute. Please use Sql.query"
+            if List.isEmpty props.SqlQuery
+            then raise <| MissingQueryException "No query provided to execute. Please use Sql.query"
             let connection = getConnection props
             try
                 if not (connection.State.HasFlag ConnectionState.Open)
@@ -682,7 +694,8 @@ module Sql =
 
     let executeRow (read: RowReader -> 't) (props: SqlProps) : Result<'t, exn> =
         try
-            if List.isEmpty props.SqlQuery then failwith "No query provided to execute. Please use Sql.query"
+            if List.isEmpty props.SqlQuery
+            then raise <| MissingQueryException "No query provided to execute. Please use Sql.query"
             let connection = getConnection props
             try
                 if not (connection.State.HasFlag ConnectionState.Open)
@@ -695,7 +708,7 @@ module Sql =
                 let rowReader = RowReader(postgresReader)
                 if reader.Read()
                 then Ok (read rowReader)
-                else failwith "Expected at least one row to be returned from the result set. Instead it was empty"
+                else raise <| NoResultsException "Expected at least one row to be returned from the result set. Instead it was empty"
             finally
                 if props.ExistingConnection.IsNone
                 then connection.Dispose()
@@ -708,7 +721,8 @@ module Sql =
                 let! token =  Async.CancellationToken
                 use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
                 let mergedToken = mergedTokenSource.Token
-                if List.isEmpty props.SqlQuery then failwith "No query provided to execute. Please use Sql.query"
+                if List.isEmpty props.SqlQuery
+                then raise <| MissingQueryException "No query provided to execute. Please use Sql.query"
                 let connection = getConnection props
                 try
                     if not (connection.State.HasFlag ConnectionState.Open)
@@ -735,7 +749,8 @@ module Sql =
                 let! token =  Async.CancellationToken
                 use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
                 let mergedToken = mergedTokenSource.Token
-                if List.isEmpty props.SqlQuery then failwith "No query provided to execute. Please use Sql.query"
+                if List.isEmpty props.SqlQuery
+                then raise <| MissingQueryException "No query provided to execute. Please use Sql.query"
                 let connection = getConnection props
                 try
                     if not (connection.State.HasFlag ConnectionState.Open)
@@ -761,7 +776,8 @@ module Sql =
                 let! token =  Async.CancellationToken
                 use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
                 let mergedToken = mergedTokenSource.Token
-                if List.isEmpty props.SqlQuery then failwith "No query provided to execute. Please use Sql.query"
+                if List.isEmpty props.SqlQuery
+                then raise <| MissingQueryException "No query provided to execute. Please use Sql.query"
                 let connection = getConnection props
                 try
                     if not (connection.State.HasFlag ConnectionState.Open)
@@ -774,7 +790,7 @@ module Sql =
                     let rowReader = RowReader(postgresReader)
                     if reader.Read()
                     then return Ok (read rowReader)
-                    else return! failwith "Expected at least one row to be returned from the result set. Instead it was empty"
+                    else return! raise <| NoResultsException "Expected at least one row to be returned from the result set. Instead it was empty"
                 finally
                     if props.ExistingConnection.IsNone
                     then connection.Dispose()
@@ -785,7 +801,8 @@ module Sql =
     /// Executes the query and returns the number of rows affected
     let executeNonQuery (props: SqlProps) : Result<int, exn> =
         try
-            if List.isEmpty props.SqlQuery then failwith "No query provided to execute..."
+            if List.isEmpty props.SqlQuery
+            then raise <| MissingQueryException "No query provided to execute..."
             let connection = getConnection props
             try
                 if not (connection.State.HasFlag ConnectionState.Open)
@@ -807,7 +824,8 @@ module Sql =
                 let! token = Async.CancellationToken
                 use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
                 let mergedToken = mergedTokenSource.Token
-                if List.isEmpty props.SqlQuery then failwith "No query provided to execute. Please use Sql.query"
+                if List.isEmpty props.SqlQuery
+                then raise <| MissingQueryException "No query provided to execute. Please use Sql.query"
                 let connection = getConnection props
                 try
                     if not (connection.State.HasFlag ConnectionState.Open)
