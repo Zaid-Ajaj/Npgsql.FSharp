@@ -1105,7 +1105,7 @@ let missingQueryTests =
                 test (sprintf "%s fails with MissingQueryException for missing query" name) {
                     use db = buildDatabase()
 
-                    Expect.throwsT<Sql.MissingQueryException>
+                    Expect.throwsT<MissingQueryException>
                         (fun () -> db.ConnectionString |> Sql.connect |> func)
                         "Check missing query fails with expected exception type"
                 })
@@ -1118,7 +1118,7 @@ let noResultsTests =
             test (sprintf "%s fails with NoResultsException if no results are returned" name) {
                 use db = buildDatabase()
 
-                Expect.throwsT<Sql.NoResultsException>
+                Expect.throwsT<NoResultsException>
                     (fun () ->
                          db.ConnectionString
                          |> Sql.connect
@@ -1127,7 +1127,23 @@ let noResultsTests =
                     "Check no results fails with NoResultsException"
            })
 
-let errorTests =  testList "Custom Exception tests" ( missingQueryTests@noResultsTests )
+let unknownColumnTest =
+    test "RowReader raises UnknownColumnException when trying to read unknown column" {
+        use db = buildDatabase()
+
+        Expect.throwsT<UnknownColumnException>
+            (fun () ->
+                 db.ConnectionString
+                 |> Sql.connect
+                 |> Sql.query "SELECT * FROM UNNEST(ARRAY ['hello', 'world'])"
+                 |> Sql.executeRow (fun read -> read.string "not_a_real_column")
+                 |> Result.throwIfError
+                 |> ignore)
+            "Check invalid column fails with expected exception type"
+    }
+
+let errorTests =
+    testList "Custom Exception tests" ( unknownColumnTest::missingQueryTests@noResultsTests )
 let allTests = testList "All tests" [ tests; errorTests ]
 
 [<EntryPoint>]

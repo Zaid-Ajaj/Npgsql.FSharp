@@ -19,6 +19,10 @@ module Async =
             return f result
         }
 
+exception MissingQueryException of string
+exception NoResultsException of string
+exception UnknownColumnException of string
+
 type Sql() =
     static member int(value: int) = SqlValue.Int value
     static member intOrNone(value: int option) = Utils.sqlMap value Sql.int
@@ -94,7 +98,13 @@ type RowReader(reader: NpgsqlDataReader) =
             |> Seq.map (fun key -> sprintf "[%s:%s]" key columnTypes.[key])
             |> String.concat ", "
 
-        failwithf "Could not read column '%s' as %s. Available columns are %s"  column columnType availableColumns
+        raise
+            <| UnknownColumnException
+                (sprintf
+                     "Could not read column '%s' as %s. Available columns are %s"
+                     column
+                     columnType
+                     availableColumns)
     with
 
     member this.int(column: string) : int =
@@ -391,9 +401,6 @@ module Sql =
         ClientCertificate: X509Certificate option
         ExistingConnection : NpgsqlConnection option
     }
-
-    exception MissingQueryException of string
-    exception NoResultsException of string
 
     let private defaultConString() : ConnectionStringBuilder = {
         Host = ""
