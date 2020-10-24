@@ -1079,5 +1079,39 @@ let tests =
 
     ]
 
+
+module Result =
+    let throwIfError<'t,'terr when 'terr :> exn> (x: Result<'t,'terr>) =
+        match x with
+        | Ok ok -> ok
+        | Error e -> raise e
+
+let dummyRead = ignore
+let testable f x =
+    f x |> Result.throwIfError |> ignore
+let asyncTestable f x =
+    f x |> Async.RunSynchronously |> Result.throwIfError |> ignore
+
+let missingQueryTests =
+        [ "Sql.execute", testable <| Sql.execute dummyRead
+          "Sql.iter", testable <| Sql.iter dummyRead
+          "Sql.executeRow", testable <| Sql.executeRow dummyRead
+          "Sql.executeNonQuery", testable Sql.executeNonQuery
+          "Sql.executeAsync", asyncTestable <| Sql.executeAsync dummyRead
+          "Sql.iterAsync", asyncTestable <| Sql.iterAsync dummyRead
+          "Sql.executeNonQueryAsync", asyncTestable Sql.executeNonQueryAsync ]
+        |> List.map
+            (fun (name, func) ->
+                test (sprintf "%s fails with MissingQueryException for missing query" name) {
+                    use db = buildDatabase()
+
+                    Expect.throwsT<Sql.MissingQueryException>
+                        (fun () -> db.ConnectionString |> Sql.connect |> func)
+                        "Check missing query fails with expected exception type"
+                })
+
+let errorTests =  testList "Custom Exception tests" missingQueryTests
+let allTests = testList "All tests" [ tests; errorTests ]
+
 [<EntryPoint>]
-let main args = runTestsWithArgs defaultConfig args tests
+let main args = runTestsWithArgs defaultConfig args allTests
