@@ -633,9 +633,17 @@ module Sql =
                 for (query, parameterSets) in queries do
                     if List.isEmpty parameterSets
                     then
-                       use command = new NpgsqlCommand(query, connection, transaction)
-                       let affectedRows = command.ExecuteNonQuery()
-                       affectedRowsByQuery.Add affectedRows
+                        use command = new NpgsqlCommand(query, connection, transaction)
+                        // detect whether the command has parameters
+                        // if that is the case, then don't execute it
+                        NpgsqlCommandBuilder.DeriveParameters(command)
+                        if command.Parameters.Count = 0 then
+                            let affectedRows = command.ExecuteNonQuery()
+                            affectedRowsByQuery.Add affectedRows
+                        else
+                            // parameterized query won't execute
+                            // when the parameter set is empty
+                            affectedRowsByQuery.Add 0
                     else
                       for parameterSet in parameterSets do
                         use command = new NpgsqlCommand(query, connection, transaction)
@@ -671,8 +679,16 @@ module Sql =
                         if List.isEmpty parameterSets
                         then
                           use command = new NpgsqlCommand(query, connection, transaction)
-                          let! affectedRows = Async.AwaitTask (command.ExecuteNonQueryAsync mergedToken)
-                          affectedRowsByQuery.Add affectedRows
+                          // detect whether the command has parameters
+                          // if that is the case, then don't execute it
+                          NpgsqlCommandBuilder.DeriveParameters(command)
+                          if command.Parameters.Count = 0 then
+                            let! affectedRows = Async.AwaitTask (command.ExecuteNonQueryAsync mergedToken)
+                            affectedRowsByQuery.Add affectedRows
+                          else
+                            // parameterized query won't execute
+                            // when the parameter set is empty
+                            affectedRowsByQuery.Add 0
                         else
                           for parameterSet in parameterSets do
                             use command = new NpgsqlCommand(query, connection, transaction)

@@ -248,6 +248,44 @@ let tests =
                 | Error err -> raise err
             }
 
+            test "Sql.executeTransaction doesn't error out on parameterized queries with empty parameter sets" {
+                use db = buildDatabase()
+                db.ConnectionString
+                |> Sql.connect
+                |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null)"
+                |> Sql.executeNonQuery
+                |> ignore
+
+                db.ConnectionString
+                |> Sql.connect
+                |> Sql.executeTransaction [
+                    "INSERT INTO users (username) VALUES (@username)", [ ]
+                ]
+                |> function
+                    | Error error -> raise error
+                    | Ok affectedRows -> Expect.equal affectedRows [0] "No rows will be affected"
+            }
+
+            testAsync "Sql.executeTransactionAsync doesn't error out on parameterized queries with empty parameter sets" {
+                use db = buildDatabase()
+                db.ConnectionString
+                |> Sql.connect
+                |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null)"
+                |> Sql.executeNonQuery
+                |> ignore
+
+                let! affectedRows =
+                    db.ConnectionString
+                    |> Sql.connect
+                    |> Sql.executeTransactionAsync [
+                        "INSERT INTO users (username) VALUES (@username)", [ ]
+                    ]
+
+                match affectedRows with
+                | Error error -> raise error
+                | Ok affectedRows -> Expect.equal affectedRows [0] "No rows will be affected"
+            }
+
             test "Sql.executeTransaction works with existing open connection" {
                 use db = buildDatabase()
                 use connection = new NpgsqlConnection(db.ConnectionString)
