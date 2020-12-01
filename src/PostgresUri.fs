@@ -28,6 +28,17 @@ let private extractPort (uri: Uri) =
     | -1 -> Some (sprintf "Port=%d" 5432)
     | n -> Some (sprintf "Port=%d" n)
 
+let private extractSslMode (uri: Uri) =
+    let query = uri.Query
+    let query = if query.StartsWith "?" then query.Substring 1 else query
+
+    query.Split '&'
+    |> Seq.tryPick (fun part ->
+        match part.Split '=' with
+        | [| "sslmode"; x |] -> Some (sprintf "SslMode=%s" x)
+        | _ -> None
+    )
+
 type Uri with
     member uri.ToPostgresConnectionString() : string =
         let parts =  [
@@ -35,6 +46,7 @@ type Uri with
             extractUser uri
             extractDatabase uri
             extractPort uri
+            extractSslMode uri
         ]
 
         String.concat ";" (List.choose id parts)
