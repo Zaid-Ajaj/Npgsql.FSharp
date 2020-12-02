@@ -296,7 +296,7 @@ module Sql =
             try
                 if not (connection.State.HasFlag ConnectionState.Open)
                 then do! connection.OpenAsync props.CancellationToken
-                use! transaction = connection.BeginTransactionAsync props.CancellationToken
+                use transaction = connection.BeginTransaction()
                 let affectedRowsByQuery = ResizeArray<int>()
                 for (query, parameterSets) in queries do
                     if List.isEmpty parameterSets
