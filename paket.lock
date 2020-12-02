@@ -1,5 +1,6 @@
 STORAGE: NONE
 STRATEGY: MIN
+LOWEST_MATCHING: TRUE
 RESTRICTION: == netstandard2.0
 NUGET
   remote: https://api.nuget.org/v3/index.json
