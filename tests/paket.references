@@ -1,5 +1,6 @@
 group Test
-    Expecto
-    FSharp.Core
-    ThrowawayDb.Postgres
-    Npgsql
+
+Expecto
+FSharp.Core
+ThrowawayDb.Postgres
+Npgsql

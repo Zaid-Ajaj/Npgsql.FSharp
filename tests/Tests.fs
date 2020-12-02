@@ -6,6 +6,7 @@ open System
 open ThrowawayDb.Postgres
 open Npgsql
 open System.Data
+open System.Linq
 
 type FsTest = {
     test_id: int
@@ -165,6 +166,76 @@ let tests =
                 |> function
                     | Ok() -> Expect.equal count 0 "The count is zero"
                     | Error err -> raise err
+            }
+
+            test "Manual transaction handling works with Sql.executeNonQuery" {
+                use db = buildDatabase()
+
+                db.ConnectionString
+                |> Sql.connect
+                |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null)"
+                |> Sql.executeNonQuery
+                |> ignore
+
+                use connection = new NpgsqlConnection(db.ConnectionString)
+                connection.Open()
+                use transaction = connection.BeginTransaction()
+                let results = ResizeArray()
+
+                for username in ["John"; "Jane"] do
+                    Sql.transaction transaction
+                    |> Sql.query "INSERT INTO users (username) VALUES(@username)"
+                    |> Sql.parameters [ "@username", Sql.text username ]
+                    |> Sql.executeNonQuery
+                    |> results.Add
+
+                if (results.Any(fun result -> match result with | Error _ -> true | _ -> false)) then
+                    transaction.Rollback()
+                else
+                    transaction.Commit()
+
+                db.ConnectionString
+                |> Sql.connect
+                |> Sql.query "SELECT COUNT(*) as user_count FROM users"
+                |> Sql.executeRow (fun read -> read.int "user_count")
+                |> function
+                    | Error error -> raise error
+                    | Ok count -> Expect.equal 2 count "There are 2 users added"
+            }
+
+            test "Manual transaction handling works with Sql.executeNonQuery and can be rolled back" {
+                use db = buildDatabase()
+
+                db.ConnectionString
+                |> Sql.connect
+                |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null)"
+                |> Sql.executeNonQuery
+                |> ignore
+
+                use connection = new NpgsqlConnection(db.ConnectionString)
+                connection.Open()
+                use transaction = connection.BeginTransaction()
+                let results = ResizeArray()
+
+                for username in [Some "John"; Some "Jane"; None] do
+                    Sql.transaction transaction
+                    |> Sql.query "INSERT INTO users (username) VALUES(@username)"
+                    |> Sql.parameters [ "@username", Sql.textOrNone username ]
+                    |> Sql.executeNonQuery
+                    |> results.Add
+
+                if (results.Any(fun result -> match result with | Error _ -> true | _ -> false)) then
+                    transaction.Rollback()
+                else
+                    transaction.Commit()
+
+                db.ConnectionString
+                |> Sql.connect
+                |> Sql.query "SELECT COUNT(*) as user_count FROM users"
+                |> Sql.executeRow (fun read -> read.int "user_count")
+                |> function
+                    | Error error -> raise error
+                    | Ok count -> Expect.equal 0 count "There are 0 users added because the transaction is rolled back"
             }
 
             testAsync "Sql.iterAsync works" {

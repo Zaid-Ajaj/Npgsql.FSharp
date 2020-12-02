@@ -3,6 +3,7 @@ group Main
     storage:none
 
     nuget FSharp.Core
+nuget Ply
     nuget TaskBuilder.fs
     nuget Npgsql
 
@@ -14,4 +15,5 @@ group Build
 group Test
   source https://api.nuget.org/v3/index.json
   nuget Expecto
+nuget Npgsql 5.0.0
   nuget ThrowawayDb.Postgres
