@@ -7,15 +7,11 @@
     <PackageIconUrl></PackageIconUrl>
     <PackageTags>fsharp;postgres;sql;ngpsql</PackageTags>
     <Authors>Zaid Ajaj</Authors>
-    <Version>3.12.0</Version>
-    <TargetFrameworks>netstandard2.0;netstandard2.1;netcoreapp3.1</TargetFrameworks>
+    <Version>3.12.1</Version>
+    <TargetFrameworks>netstandard2.0</TargetFrameworks>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <LangVersion>latest</LangVersion>
-    <PackageReleaseNotes>
-      - Extend the execution model to allow running SQL commands against an existing transaction
-      - Update Npgsql to latest v5.0.0
-      - Introduce Npgsql.FSharp.Tasks for task based SQL commands
-    </PackageReleaseNotes>
+    <PackageReleaseNotes>Relax FSharp.Core dependency</PackageReleaseNotes>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="OptionWorkflow.fs" />

@@ -1,19 +1,23 @@
 group Main
-    source https://api.nuget.org/v3/index.json
-    storage:none
+  framework: netstandard2.0
+  strategy: min
+  source https://api.nuget.org/v3/index.json
+  storage:none
 
-    nuget FSharp.Core
-nuget Ply
-    nuget TaskBuilder.fs
-    nuget Npgsql
+  nuget FSharp.Core ~> 4.7.2
+  nuget Ply 0.3.1
+  nuget Npgsql 5.0.0
 
 group Build
   source https://api.nuget.org/v3/index.json
 
-  nuget FAKE
+  nuget FAKE 4.64.13
 
 group Test
+  framework: netstandard2.0,netcoreapp3.1
+  strategy: min
   source https://api.nuget.org/v3/index.json
-  nuget Expecto
-nuget Npgsql 5.0.0
-  nuget ThrowawayDb.Postgres
+  nuget FSharp.Core ~> 4.7.2
+  nuget Expecto 8.13.1
+  nuget Npgsql 5.0.0
+  nuget ThrowawayDb.Postgres 1.0
