@@ -1,4 +1,4 @@
-module Main
+module NgpsqlFSharpTests
 
 open Expecto
 open Npgsql.FSharp
@@ -1284,6 +1284,3 @@ let unknownColumnTest =
 let errorTests =
     testList "Custom Exception tests" ( unknownColumnTest::missingQueryTests@noResultsTests )
 let allTests = testList "All tests" [ tests; errorTests ]
-
-[<EntryPoint>]
-let main args = runTestsWithArgs defaultConfig args allTests
