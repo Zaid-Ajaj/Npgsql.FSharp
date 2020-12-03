@@ -17,7 +17,7 @@ paket add Npgsql.FSharp --group Main
 
 This package comes in two flavors, available through _mutually exclusive_ namespaces:
  - `Npgsql.FSharp`: which exposes an API that works best with F# `async`
- - `Npgsql.FShap.Tasks`: which exposes the _same_ API that works best with tasks
+ - `Npgsql.FSharp.Tasks`: which exposes the _same_ API that works best with tasks
 
 If you don't know which namespace you need, go for `Npgsql.FSharp.Tasks` because it is less opinionated, works out of the box with `Task<'t>` and has less friction than the `Npgsql.FSharp` namespace.
 
