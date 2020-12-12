@@ -19,6 +19,7 @@ type SqlValue =
     | Bit of bool
     | Bool of bool
     | Number of double
+    | Money of decimal
     | Decimal of decimal
     | Bytea of byte[]
     | Uuid of Guid
@@ -64,8 +65,8 @@ type Sql() =
     static member doubleOrNone(value: double option) = Utils.sqlMap value Sql.double
     static member decimal(value: decimal) = SqlValue.Decimal value
     static member decimalOrNone(value: decimal option) = Utils.sqlMap value Sql.decimal
-    static member money(value: decimal) = SqlValue.Decimal value
-    static member moneyOrNone(value: decimal option) = Sql.decimalOrNone value
+    static member money(value: decimal) = SqlValue.Money value
+    static member moneyOrNone(value: decimal option) = Utils.sqlMap value Sql.money
     static member int8(value: int8) = SqlValue.TinyInt value
     static member int8OrNone(value: int8 option) = Utils.sqlMap value Sql.int8
     static member int16(value: int16) = SqlValue.Short value
