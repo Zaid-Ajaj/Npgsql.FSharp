@@ -7,11 +7,11 @@
     <PackageIconUrl></PackageIconUrl>
     <PackageTags>fsharp;postgres;sql;ngpsql</PackageTags>
     <Authors>Zaid Ajaj</Authors>
-    <Version>3.12.3</Version>
+    <Version>3.12.4</Version>
     <TargetFrameworks>netstandard2.0</TargetFrameworks>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <LangVersion>latest</LangVersion>
-    <PackageReleaseNotes>Distinction between decimal to money and decimal to numeric</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds int64Array support</PackageReleaseNotes>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="OptionWorkflow.fs" />

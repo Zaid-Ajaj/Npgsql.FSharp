@@ -31,6 +31,7 @@ type SqlValue =
     | Jsonb of string
     | StringArray of string array
     | IntArray of int array
+    | LongArray of int64 array
     | Point of NpgsqlPoint
 
 module internal Utils =
@@ -102,6 +103,8 @@ type Sql() =
     static member stringArrayOrNone(value: string[] option) = Utils.sqlMap value Sql.stringArray
     static member intArray(value: int[]) = SqlValue.IntArray value
     static member intArrayOrNone(value: int[] option) = Utils.sqlMap value Sql.intArray
+    static member int64Array(value: int64[]) = SqlValue.LongArray value
+    static member int64ArrayOrNone(value: int64[] option) = Utils.sqlMap value Sql.int64Array
     static member dbnull = SqlValue.Null
     static member parameter(genericParameter: NpgsqlParameter) = SqlValue.Parameter genericParameter
     static member point(value: NpgsqlPoint) = SqlValue.Point value
@@ -173,6 +176,19 @@ type RowReader(reader: NpgsqlDataReader) =
             then None
             else Some (reader.GetFieldValue<int[]>(columnIndex))
         | false, _ -> failToRead column "int[]"
+
+    member this.int64Array(column: string) : int64[] =
+        match columnDict.TryGetValue(column) with
+        | true, columnIndex -> reader.GetFieldValue<int64[]>(columnIndex)
+        | false, _ -> failToRead column "int64[]"
+
+    member this.int64ArrayOrNone(column: string) : int64[] option =
+        match columnDict.TryGetValue(column) with
+        | true, columnIndex ->
+            if reader.IsDBNull(columnIndex)
+            then None
+            else Some (reader.GetFieldValue<int64[]>(columnIndex))
+        | false, _ -> failToRead column "int64[]"
 
     /// Reads the given column of type timestamptz as DateTimeOffset.
     /// PostgreSQL stores the values of timestamptz as UTC in the database.

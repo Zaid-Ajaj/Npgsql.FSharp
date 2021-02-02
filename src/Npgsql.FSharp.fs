@@ -236,6 +236,7 @@ module Sql =
             | SqlValue.Time x -> add x NpgsqlDbType.Time
             | SqlValue.StringArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Text)
             | SqlValue.IntArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Integer)
+            | SqlValue.LongArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Bigint)
             | SqlValue.Parameter x ->
                 x.ParameterName <- normalizedParameterName
                 ignore (cmd.Parameters.Add(x))
