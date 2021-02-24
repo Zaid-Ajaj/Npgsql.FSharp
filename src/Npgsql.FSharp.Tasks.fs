@@ -230,7 +230,6 @@ module Sql =
             | SqlValue.Decimal number -> add number NpgsqlDbType.Numeric
             | SqlValue.Money number -> add number NpgsqlDbType.Money
             | SqlValue.Long number -> add number NpgsqlDbType.Bigint
-            | SqlValue.Short number -> add number NpgsqlDbType.Smallint
             | SqlValue.Bytea binary -> add binary NpgsqlDbType.Bytea
             | SqlValue.TimeWithTimeZone x -> add x NpgsqlDbType.TimeTz
             | SqlValue.Null -> cmd.Parameters.AddWithValue(normalizedParameterName, DBNull.Value) |> ignore
@@ -275,11 +274,11 @@ module Sql =
                         // when the parameter set is empty
                         affectedRowsByQuery.Add 0
                 else
-                  for parameterSet in parameterSets do
-                    use command = new NpgsqlCommand(query, connection, transaction)
-                    populateRow command parameterSet
-                    let affectedRows = command.ExecuteNonQuery()
-                    affectedRowsByQuery.Add affectedRows
+                    for parameterSet in parameterSets do
+                        use command = new NpgsqlCommand(query, connection, transaction)
+                        populateRow command parameterSet
+                        let affectedRows = command.ExecuteNonQuery()
+                        affectedRowsByQuery.Add affectedRows
 
             transaction.Commit()
             List.ofSeq affectedRowsByQuery
@@ -303,25 +302,24 @@ module Sql =
                 use transaction = connection.BeginTransaction()
                 let affectedRowsByQuery = ResizeArray<int>()
                 for (query, parameterSets) in queries do
-                    if List.isEmpty parameterSets
-                    then
-                      use command = new NpgsqlCommand(query, connection, transaction)
-                      // detect whether the command has parameters
-                      // if that is the case, then don't execute it
-                      NpgsqlCommandBuilder.DeriveParameters(command)
-                      if command.Parameters.Count = 0 then
-                        let! affectedRows = command.ExecuteNonQueryAsync props.CancellationToken
-                        affectedRowsByQuery.Add affectedRows
-                      else
-                        // parameterized query won't execute
-                        // when the parameter set is empty
-                        affectedRowsByQuery.Add 0
-                    else
-                      for parameterSet in parameterSets do
+                    if List.isEmpty parameterSets then
                         use command = new NpgsqlCommand(query, connection, transaction)
-                        populateRow command parameterSet
-                        let! affectedRows = command.ExecuteNonQueryAsync props.CancellationToken
-                        affectedRowsByQuery.Add affectedRows
+                        // detect whether the command has parameters
+                        // if that is the case, then don't execute it
+                        NpgsqlCommandBuilder.DeriveParameters(command)
+                        if command.Parameters.Count = 0 then
+                            let! affectedRows = command.ExecuteNonQueryAsync props.CancellationToken
+                            affectedRowsByQuery.Add affectedRows
+                        else
+                            // parameterized query won't execute
+                            // when the parameter set is empty
+                            affectedRowsByQuery.Add 0
+                    else
+                        for parameterSet in parameterSets do
+                            use command = new NpgsqlCommand(query, connection, transaction)
+                            populateRow command parameterSet
+                            let! affectedRows = command.ExecuteNonQueryAsync props.CancellationToken
+                            affectedRowsByQuery.Add affectedRows
                 do! transaction.CommitAsync props.CancellationToken
                 return List.ofSeq affectedRowsByQuery
             finally

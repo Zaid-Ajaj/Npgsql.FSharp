@@ -236,6 +236,7 @@ module Sql =
             | SqlValue.Time x -> add x NpgsqlDbType.Time
             | SqlValue.StringArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Text)
             | SqlValue.IntArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Integer)
+            | SqlValue.ShortArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Smallint)
             | SqlValue.LongArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Bigint)
             | SqlValue.Parameter x ->
                 x.ParameterName <- normalizedParameterName
@@ -258,8 +259,7 @@ module Sql =
                 use transaction = connection.BeginTransaction()
                 let affectedRowsByQuery = ResizeArray<int>()
                 for (query, parameterSets) in queries do
-                    if List.isEmpty parameterSets
-                    then
+                    if List.isEmpty parameterSets then
                         use command = new NpgsqlCommand(query, connection, transaction)
                         // detect whether the command has parameters
                         // if that is the case, then don't execute it
@@ -272,12 +272,11 @@ module Sql =
                             // when the parameter set is empty
                             affectedRowsByQuery.Add 0
                     else
-                      for parameterSet in parameterSets do
-                        use command = new NpgsqlCommand(query, connection, transaction)
-                        populateRow command parameterSet
-                        let affectedRows = command.ExecuteNonQuery()
-                        affectedRowsByQuery.Add affectedRows
-
+                        for parameterSet in parameterSets do
+                            use command = new NpgsqlCommand(query, connection, transaction)
+                            populateRow command parameterSet
+                            let affectedRows = command.ExecuteNonQuery()
+                            affectedRowsByQuery.Add affectedRows
                 transaction.Commit()
                 Ok (List.ofSeq affectedRowsByQuery)
             finally
@@ -287,7 +286,6 @@ module Sql =
                     // leave connections open
                     // when provided from outside
                     ()
-
         with
         | error -> Error error
 
@@ -307,25 +305,24 @@ module Sql =
                     use transaction = connection.BeginTransaction ()
                     let affectedRowsByQuery = ResizeArray<int>()
                     for (query, parameterSets) in queries do
-                        if List.isEmpty parameterSets
-                        then
-                          use command = new NpgsqlCommand(query, connection, transaction)
-                          // detect whether the command has parameters
-                          // if that is the case, then don't execute it
-                          NpgsqlCommandBuilder.DeriveParameters(command)
-                          if command.Parameters.Count = 0 then
-                            let! affectedRows = Async.AwaitTask (command.ExecuteNonQueryAsync mergedToken)
-                            affectedRowsByQuery.Add affectedRows
-                          else
-                            // parameterized query won't execute
-                            // when the parameter set is empty
-                            affectedRowsByQuery.Add 0
-                        else
-                          for parameterSet in parameterSets do
+                        if List.isEmpty parameterSets then
                             use command = new NpgsqlCommand(query, connection, transaction)
-                            populateRow command parameterSet
-                            let! affectedRows = Async.AwaitTask (command.ExecuteNonQueryAsync mergedToken)
-                            affectedRowsByQuery.Add affectedRows
+                            // detect whether the command has parameters
+                            // if that is the case, then don't execute it
+                            NpgsqlCommandBuilder.DeriveParameters(command)
+                            if command.Parameters.Count = 0 then
+                                let! affectedRows = Async.AwaitTask (command.ExecuteNonQueryAsync mergedToken)
+                                affectedRowsByQuery.Add affectedRows
+                            else
+                                // parameterized query won't execute
+                                // when the parameter set is empty
+                                affectedRowsByQuery.Add 0
+                        else
+                            for parameterSet in parameterSets do
+                                use command = new NpgsqlCommand(query, connection, transaction)
+                                populateRow command parameterSet
+                                let! affectedRows = Async.AwaitTask (command.ExecuteNonQueryAsync mergedToken)
+                                affectedRowsByQuery.Add affectedRows
                     do! Async.AwaitTask(transaction.CommitAsync mergedToken)
                     return Ok (List.ofSeq affectedRowsByQuery)
                 finally
