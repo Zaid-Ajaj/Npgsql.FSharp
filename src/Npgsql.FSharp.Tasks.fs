@@ -230,6 +230,7 @@ module Sql =
             | SqlValue.Decimal number -> add number NpgsqlDbType.Numeric
             | SqlValue.Money number -> add number NpgsqlDbType.Money
             | SqlValue.Long number -> add number NpgsqlDbType.Bigint
+            | SqlValue.Short number -> add number NpgsqlDbType.Smallint
             | SqlValue.Bytea binary -> add binary NpgsqlDbType.Bytea
             | SqlValue.TimeWithTimeZone x -> add x NpgsqlDbType.TimeTz
             | SqlValue.Null -> cmd.Parameters.AddWithValue(normalizedParameterName, DBNull.Value) |> ignore
@@ -238,6 +239,7 @@ module Sql =
             | SqlValue.Time x -> add x NpgsqlDbType.Time
             | SqlValue.StringArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Text)
             | SqlValue.IntArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Integer)
+            | SqlValue.ShortArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Smallint)
             | SqlValue.LongArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Bigint)
             | SqlValue.Parameter x ->
                 x.ParameterName <- normalizedParameterName

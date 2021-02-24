@@ -7,11 +7,11 @@
     <PackageIconUrl></PackageIconUrl>
     <PackageTags>fsharp;postgres;sql;ngpsql</PackageTags>
     <Authors>Zaid Ajaj</Authors>
-    <Version>3.12.4</Version>
+    <Version>3.12.5</Version>
     <TargetFrameworks>netstandard2.0</TargetFrameworks>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <LangVersion>latest</LangVersion>
-    <PackageReleaseNotes>Adds int64Array support</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds int16Array support</PackageReleaseNotes>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="OptionWorkflow.fs" />
