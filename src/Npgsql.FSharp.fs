@@ -511,7 +511,7 @@ module Sql =
             | error -> Error error
 
     /// Executes the query as asynchronously and returns the number of rows affected
-    let executeNonQueryAsync  (props: SqlProps) =
+    let executeNonQueryAsync (props: SqlProps) =
         async {
             try
                 let! token = Async.CancellationToken
