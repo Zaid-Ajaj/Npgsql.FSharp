@@ -59,7 +59,11 @@ let buildDatabaseConnection handleInfinity : ThrowawayDatabase =
     let databasePassword =
         let runningTravis = Environment.GetEnvironmentVariable "TESTING_IN_TRAVISCI"
         if isNull runningTravis || String.IsNullOrWhiteSpace runningTravis
-        then "postgres" // for local tests
+        then
+            let localPwd = Environment.GetEnvironmentVariable "Npgsql.Fsharp.DbPwd"
+            if String.IsNullOrWhiteSpace localPwd
+            then "postgres" // for local tests
+            else localPwd
         else "" // for Travis CI
 
     let connection =
@@ -1149,6 +1153,145 @@ let tests =
 
                 Expect.equal expected table "All rows from `point_test` table"
             }
+
+            test "Sql returned types" {
+                //Int
+                let data = 1
+                let value = Sql.int data
+                Expect.equal (SqlValue.Int data) value "Unexpected value Sql.int"
+
+                let value = Sql.intOrNone (Some data)
+                Expect.equal (SqlValue.Int data) value "Unexpected value Sql.intOrNone (Some)"
+
+                let value = Sql.intOrNone None
+                Expect.equal SqlValue.Null value "Unexpected value Sql.intOrNone (None)"
+
+                let value = Sql.intOrValueNone (ValueSome data)
+                Expect.equal (SqlValue.Int data) value "Unexpected value Sql.intOrValueNone (ValueSome)"
+
+                let value = Sql.intOrValueNone ValueNone
+                Expect.equal SqlValue.Null value "Unexpected value Sql.intOrValueNone (ValueNone)"
+
+                //String
+                let data = "str"
+                let value = Sql.string data
+                Expect.equal (SqlValue.String data) value "Unexpected value Sql.string"
+
+                let value = Sql.stringOrNone (Some data)
+                Expect.equal (SqlValue.String data) value "Unexpected value Sql.stringOrNone (Some)"
+
+                let value = Sql.stringOrNone None
+                Expect.equal SqlValue.Null value "Unexpected value Sql.stringOrNone (None)"
+
+                let value = Sql.stringOrValueNone (ValueSome data)
+                Expect.equal (SqlValue.String data) value "Unexpected value Sql.stringOrValueNone (ValueSome)"
+
+                let value = Sql.stringOrValueNone ValueNone
+                Expect.equal SqlValue.Null value "Unexpected value Sql.stringOrValueNone (ValueNone)"
+
+                //Text
+                let data = "text"
+                let value = Sql.text data
+                Expect.equal (SqlValue.String data) value "Unexpected value Sql.text"
+
+                let value = Sql.textOrNone (Some data)
+                Expect.equal (SqlValue.String data) value "Unexpected value Sql.textOrNone (Some)"
+
+                let value = Sql.textOrNone None
+                Expect.equal SqlValue.Null value "Unexpected value Sql.textOrNone (None)"
+
+                let value = Sql.textOrValueNone (ValueSome data)
+                Expect.equal (SqlValue.String data) value "Unexpected value Sql.textOrValueNone (ValueSome)"
+
+                let value = Sql.textOrValueNone ValueNone
+                Expect.equal SqlValue.Null value "Unexpected value Sql.textOrValueNone (ValueNone)"
+
+                //bit
+                let data = true
+                let value = Sql.bit data
+                Expect.equal (SqlValue.Bit data) value "Unexpected value Sql.bit"
+
+                let value = Sql.bitOrNone (Some data)
+                Expect.equal (SqlValue.Bit data) value "Unexpected value Sql.bitOrNone (Some)"
+
+                let value = Sql.bitOrNone None
+                Expect.equal SqlValue.Null value "Unexpected value Sql.bitOrNone (None)"
+
+                let value = Sql.bitOrValueNone (ValueSome data)
+                Expect.equal (SqlValue.Bit data) value "Unexpected value Sql.bitOrValueNone (ValueSome)"
+
+                let value = Sql.bitOrValueNone ValueNone
+                Expect.equal SqlValue.Null value "Unexpected value Sql.bitOrValueNone (ValueNone)"
+
+                //bool
+                let data = true
+                let value = Sql.bool data
+                Expect.equal (SqlValue.Bool data) value "Unexpected value Sql.bool"
+
+                let value = Sql.boolOrNone (Some data)
+                Expect.equal (SqlValue.Bool data) value "Unexpected value Sql.boolOrNone (Some)"
+
+                let value = Sql.boolOrNone None
+                Expect.equal SqlValue.Null value "Unexpected value Sql.boolOrNone (None)"
+
+                let value = Sql.boolOrValueNone (ValueSome data)
+                Expect.equal (SqlValue.Bool data) value "Unexpected value Sql.boolOrValueNone (ValueSome)"
+
+                let value = Sql.boolOrValueNone ValueNone
+                Expect.equal SqlValue.Null value "Unexpected value Sql.boolOrValueNone (ValueNone)"
+
+                //double
+                let data = 7.
+                let value = Sql.double data
+                Expect.equal (SqlValue.Number data) value "Unexpected value Sql.double"
+
+                let value = Sql.doubleOrNone (Some data)
+                Expect.equal (SqlValue.Number data) value "Unexpected value Sql.doubleOrNone (Some)"
+
+                let value = Sql.doubleOrNone None
+                Expect.equal SqlValue.Null value "Unexpected value Sql.doubleOrNone (None)"
+
+                let value = Sql.doubleOrValueNone (ValueSome data)
+                Expect.equal (SqlValue.Number data) value "Unexpected value Sql.doubleOrValueNone (ValueSome)"
+
+                let value = Sql.doubleOrValueNone ValueNone
+                Expect.equal SqlValue.Null value "Unexpected value Sql.doubleOrValueNone (ValueNone)"
+                
+                //decimal
+                let data = 9M
+                let value = Sql.decimal data
+                Expect.equal (SqlValue.Decimal data) value "Unexpected value Sql.decimal"
+
+                let value = Sql.decimalOrNone (Some data)
+                Expect.equal (SqlValue.Decimal data) value "Unexpected value Sql.decimalOrNone (Some)"
+
+                let value = Sql.decimalOrNone None
+                Expect.equal SqlValue.Null value "Unexpected value Sql.decimalOrNone (None)"
+
+                let value = Sql.decimalOrValueNone (ValueSome data)
+                Expect.equal (SqlValue.Decimal data) value "Unexpected value Sql.decimalOrValueNone (ValueSome)"
+
+                let value = Sql.decimalOrValueNone ValueNone
+                Expect.equal SqlValue.Null value "Unexpected value Sql.decimalOrValueNone (ValueNone)"
+
+                //timestamp
+                let data = DateTime(2021, 02, 28)
+                let value = Sql.timestamp data
+                Expect.equal (SqlValue.Timestamp data) value "Unexpected value Sql.timestamp"
+
+                let value = Sql.timestampOrNone (Some data)
+                Expect.equal (SqlValue.Timestamp data) value "Unexpected value Sql.timestampOrNone (Some)"
+
+                let value = Sql.timestampOrNone None
+                Expect.equal SqlValue.Null value "Unexpected value Sql.timestampOrNone (None)"
+
+                let value = Sql.timestampOrValueNone (ValueSome data)
+                Expect.equal (SqlValue.Timestamp data) value "Unexpected value Sql.timestampOrValueNone (ValueSome)"
+
+                let value = Sql.timestampOrValueNone ValueNone
+                Expect.equal SqlValue.Null value "Unexpected value Sql.timestampOrValueNone (ValueNone)"
+            }
+
         ] |> testSequenced
 
     ]

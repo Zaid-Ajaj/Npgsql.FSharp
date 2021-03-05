@@ -59,7 +59,11 @@ let buildDatabaseConnection handleInfinity : ThrowawayDatabase =
     let databasePassword =
         let runningTravis = Environment.GetEnvironmentVariable "TESTING_IN_TRAVISCI"
         if isNull runningTravis || String.IsNullOrWhiteSpace runningTravis
-        then "postgres" // for local tests
+        then
+            let localPwd = Environment.GetEnvironmentVariable "Npgsql.Fsharp.DbPwd"
+            if String.IsNullOrWhiteSpace localPwd
+            then "postgres" // for local tests
+            else localPwd
         else "" // for Travis CI
 
     let connection =
