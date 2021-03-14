@@ -1,4 +1,4 @@
-# Counting Rows
+# Counting rows
 
 Count the number of rows using the `COUNT(*)` function which will return a single row with a single value (scalar) which we can read using `Sql.executeRow`
 ```fsharp
