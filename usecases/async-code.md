@@ -55,7 +55,7 @@ async {
 ### Cancellation
 
 Asynchoronous operations can be cancelled. This is useful for example in web applications where the user has triggered an expensive operation but decides to close the tab because they were waiting for too long. In the ideal case, you want the stop the expensive operation once the request is aborted. Typically, the web framework you are using will give you a cancellation token that gets "cancelled" when the request connection is aborted. You can use that cancellation token as part of the asynchoronous database operations:
-```fsharp {highlight: [9]}
+```fsharp {highlight: [11]}
 open Npgsql.FSharp
 open System.Threading
 open System.Threading.Tasks
