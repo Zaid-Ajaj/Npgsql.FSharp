@@ -26,6 +26,7 @@ let readUsers (connectionString: string) : User list =
         })
 ```
 The function `readUsers` takes the connection string as a parameter. You can use it as follows:
+
 ```fsharp
 let connectionString = "..."
 let users = readUsers connectionString
