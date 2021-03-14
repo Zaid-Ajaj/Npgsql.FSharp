@@ -1,6 +1,6 @@
 # Returing inserted rows
 
-When adding rows into a table, we usually run `Sql.executeNonQuery` which returns the number of rows added. However, sometimes we actually want to retrieve the added rows. In PostgreSQL, this is super simple using the [RETURNING CLAUSE](). Using `RETURNING` in an `INSERT` , `UPDATE` or `DELETE` query makes it _return_ the actual affected rows instead of just the number of affected rows.
+When adding rows into a table, we usually run `Sql.executeNonQuery` which returns the number of rows added. However, sometimes we actually want to retrieve the added rows. In PostgreSQL, this is super simple using the [RETURNING CLAUSE](https://www.postgresql.org/docs/13/dml-returning.html). Using `RETURNING` in an `INSERT` , `UPDATE` or `DELETE` query makes it _return_ the actual affected rows instead of just the number of affected rows.
 
 Take this `users` table.
 ```sql
@@ -16,7 +16,7 @@ open Npgsql.FSharp
 
 type User = { Id: int; Username: string; Email: string }
 
-let addUser (connectionString: string, username:string, email:string) : User =
+let addUser (connectionString:string, username:string, email:string) : User =
     connectionString
     |> Sql.connect
     |> Sql.query "INSERT INTO users (username, email) VALUES (@username, @email) RETURNING *"

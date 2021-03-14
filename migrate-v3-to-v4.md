@@ -1,5 +1,6 @@
 # Migrating from V3 to V4
 
+### Problems with v3
 In the latest versions of Npgsql.FSharp v3 we introduced two namespaces:
  - `Npgsql.FSharp`
  - `Npgsql.FSharp.Tasks`
@@ -8,6 +9,7 @@ In V3, `Npgsql.FSharp` had synchronous functions such as `Sql.execute` return `R
 
 This was all a bit too confusing because the `Npgsql.FSharp` namespace sounded like the default namespace but it was a bit too much in the sense that users didn't always need to wrap failing operations into `Result` and `Async` was mostly not really needed and had to be converted to `Task` when used inside web applications. This is why the other namespace emerged to solve these issues.
 
+### Changes in v4
 Now in v4 the namespace `Npgsql.FSharp.Tasks` will become the default and only namespace `Npgsql.FSharp` and will expose functions that don't return `Result` nor `Async`. Instead just values of `'t` and `Task<'t>`. This simplifies the usage a lot and brings the public API surface to a minimum.
 
 In v4 we also no longer have `Sql.transaction` because it was redundant. Using `Sql.existingConnection` was sufficient because once you initiated a transaction on a connection, the connection becomes bound with that transaction.
