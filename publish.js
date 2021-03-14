@@ -5,7 +5,8 @@ var packageUrl = "https://github.com/Zaid-Ajaj/Npgsql.FSharp.git";
 console.log("Publishing to ", packageUrl);
 
 ghPages.publish(".", {
-    repo: packageUrl
+    repo: packageUrl,
+    remove: "./node_modules"
 }, function (e) {
     if (e === undefined) {
         console.log("Finished publishing succesfully");
