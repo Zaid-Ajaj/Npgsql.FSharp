@@ -165,10 +165,10 @@ type RowReader(reader: NpgsqlDataReader) =
         raise
             <| UnknownColumnException
                 (sprintf
-                     "Could not read column '%s' as %s. Available columns are %s"
-                     column
-                     columnType
-                     availableColumns)
+                    "Could not read column '%s' as %s. Available columns are %s"
+                    column
+                    columnType
+                    availableColumns)
     with
 
     member this.int(column: string) : int =
@@ -303,6 +303,11 @@ type RowReader(reader: NpgsqlDataReader) =
         | false, _ ->
             failToRead column "DateTimeOffset"
 
+    /// Reads the given column of type timestamptz as DateTimeOffset.
+    /// PostgreSQL stores the values of timestamptz as UTC in the database.
+    /// However, when Npgsql reads those values, they are converted to local offset of the machine running this code.
+    /// See https://www.npgsql.org/doc/types/datetime.html#detailed-behavior-reading-values-from-the-database
+    /// This function however, converts it back to UTC the same way it was stored.
     member this.datetimeOffsetOrValueNone(column: string) : DateTimeOffset voption =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
@@ -345,7 +350,7 @@ type RowReader(reader: NpgsqlDataReader) =
             then None
             else Some (reader.GetInt64(columnIndex))
         | false, _ -> failToRead column "int64"
-    
+
     member this.int64OrValueNone(column: string) : int64 voption =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
@@ -375,15 +380,18 @@ type RowReader(reader: NpgsqlDataReader) =
             else ValueSome (reader.GetString(columnIndex))
         | false, _ -> failToRead column "string"
 
+    /// <summary>Alias for reading string</summary>
     member this.text(column: string) : string = this.string column
+    /// <summary>Alias for reading stringOrNone</summary>
     member this.textOrNone(column: string) : string option = this.stringOrNone column
+    /// <summary>Alias for reading stringOrValueNone</summary>
     member this.textOrValueNone(column: string) : string voption = this.stringOrValueNone column
-
+    /// <summary>Reads a column as a boolean value</summary>
     member this.bool(column: string) : bool =
         match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetFieldValue<bool>(columnIndex)
+        | true, columnIndex -> reader.GetBoolean(columnIndex)
         | false, _ -> failToRead column "bool"
-
+    /// <summary>Reads a column as a boolean value or returns None when the column value is null</summary>
     member this.boolOrNone(column: string) : bool option =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
@@ -391,7 +399,7 @@ type RowReader(reader: NpgsqlDataReader) =
             then None
             else Some (reader.GetFieldValue<bool>(columnIndex))
         | false, _ -> failToRead column "bool"
-
+    /// <summary>Reads a column as a boolean value or returns ValueNone when the column value is null</summary>
     member this.boolOrValueNone(column: string) : bool voption =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
@@ -399,12 +407,12 @@ type RowReader(reader: NpgsqlDataReader) =
             then ValueNone
             else ValueSome (reader.GetFieldValue<bool>(columnIndex))
         | false, _ -> failToRead column "bool"
-
+    /// <summary>Reads the column value as decimal</summary>
     member this.decimal(column: string) : decimal =
         match columnDict.TryGetValue(column) with
         | true, columnIndex -> reader.GetDecimal(columnIndex)
         | false, _ -> failToRead column "decimal"
-
+    /// <summary>Reads the column value as decimal or returns None when the column is null</summary>
     member this.decimalOrNone(column: string) : decimal option =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
@@ -412,7 +420,7 @@ type RowReader(reader: NpgsqlDataReader) =
             then None
             else Some (reader.GetDecimal(columnIndex))
         | false, _ -> failToRead column "decimal"
-
+    /// <summary>Reads the column value as decimal or returns ValueNone when the column is null</summary>
     member this.decimalOrValueNone(column: string) : decimal voption =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
@@ -442,49 +450,7 @@ type RowReader(reader: NpgsqlDataReader) =
             else ValueSome (reader.GetDouble(columnIndex))
         | false, _ -> failToRead column "double"
 
-    member this.timestamp(column: string) : NpgsqlDateTime =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetTimeStamp(columnIndex)
-        | false, _ -> failToRead column "timestamp"
-
-    member this.timestampOrNone(column: string) : NpgsqlDateTime option =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then None
-            else Some (reader.GetTimeStamp(columnIndex))
-        | false, _ -> failToRead column "timestamp"
-
-    member this.timestampOrValueNone(column: string) : NpgsqlDateTime voption =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then ValueNone
-            else ValueSome (reader.GetTimeStamp(columnIndex))
-        | false, _ -> failToRead column "timestamp"
-
     member this.NpgsqlReader = reader
-
-    member this.timestamptz(column: string) : NpgsqlDateTime =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetTimeStamp(columnIndex)
-        | false, _ -> failToRead column "timestampz"
-
-    member this.timestamptzOrNone(column: string) : NpgsqlDateTime option =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then None
-            else Some (reader.GetTimeStamp(columnIndex))
-        | false, _ -> failToRead column "timestampz"
-
-    member this.timestamptzOrValueNone(column: string) : NpgsqlDateTime voption =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then ValueNone
-            else ValueSome (reader.GetTimeStamp(columnIndex))
-        | false, _ -> failToRead column "timestampz"
 
     /// Gets the value of the specified column as a globally-unique identifier (GUID).
     member this.uuid(column: string) : Guid =
@@ -530,37 +496,6 @@ type RowReader(reader: NpgsqlDataReader) =
             else ValueSome(reader.GetFieldValue<Guid []>(columnIndex))
         | false, _ -> failToRead column "guid[]"
 
-    /// Gets the value of the specified column as an `NpgsqlTypes.NpgsqlDate`, Npgsql's provider-specific type for dates.
-    ///
-    /// PostgreSQL's date type represents dates from 4713 BC to 5874897 AD, while .NET's `DateTime` only supports years from 1 to 1999. If you require years outside this range use this accessor.
-    ///
-    /// See http://www.postgresql.org/docs/current/static/datatype-datetime.html to learn more
-    member this.date(column: string) : NpgsqlTypes.NpgsqlDate =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetDate(columnIndex)
-        | false, _ -> failToRead column "date"
-
-    /// Gets the value of the specified column as an `NpgsqlTypes.NpgsqlDate`, Npgsql's provider-specific type for dates.
-    ///
-    /// PostgreSQL's date type represents dates from 4713 BC to 5874897 AD, while .NET's `DateTime` only supports years from 1 to 1999. If you require years outside this range use this accessor.
-    ///
-    /// See http://www.postgresql.org/docs/current/static/datatype-datetime.html to learn more
-    member this.dateOrNone(column: string) : NpgsqlTypes.NpgsqlDate option =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull (columnIndex)
-            then None
-            else Some (reader.GetDate(columnIndex))
-        | false, _ -> failToRead column "date"
-
-    member this.dateOrValueNone(column: string) : NpgsqlDate voption =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull (columnIndex)
-            then ValueNone
-            else ValueSome (reader.GetDate(columnIndex))
-        | false, _ -> failToRead column "date"
-
     /// Gets the value of the specified column as a System.DateTime object.
     member this.dateTime(column: string) : DateTime =
         match columnDict.TryGetValue(column) with
@@ -584,21 +519,13 @@ type RowReader(reader: NpgsqlDataReader) =
             else ValueSome (reader.GetDateTime(columnIndex))
         | false, _ -> failToRead column "datetime"
 
-    /// Gets the value of the specified column as an `NpgsqlTypes.NpgsqlTimeSpan`, Npgsql's provider-specific type for time spans.
-    ///
-    /// PostgreSQL's interval type has has a resolution of 1 microsecond and ranges from -178000000 to 178000000 years, while .NET's TimeSpan has a resolution of 100 nanoseconds and ranges from roughly -29247 to 29247 years.
-    member this.interval(column: string) : NpgsqlTypes.NpgsqlTimeSpan =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetInterval(columnIndex)
-        | false, _ -> failToRead column "interval"
-
-    /// Reads the specified column as `byte[]`
+    /// <summary>Reads the specified column as byte[]</summary>
     member this.bytea(column: string) : byte[] =
         match columnDict.TryGetValue(column) with
         | true, columnIndex -> reader.GetFieldValue<byte[]>(columnIndex)
         | false, _ -> failToRead column "byte[]"
 
-    /// Reads the specified column as `byte[]`
+    /// <summary>Reads the specified column as byte[] or returns None when the column value is null</summary>
     member this.byteaOrNone(column: string) : byte[] option =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
@@ -606,7 +533,7 @@ type RowReader(reader: NpgsqlDataReader) =
             then None
             else Some (reader.GetFieldValue<byte[]>(columnIndex))
         | false, _ -> failToRead column "byte[]"
-
+    /// <summary>Reads the specified column as byte[] or returns ValueNone when the column value is null</summary>
     member this.byteaOrValueNone(column: string) : byte[] voption =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->

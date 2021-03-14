@@ -132,9 +132,7 @@ let tests =
                         active = read.bool "active"
                         salary = read.decimal "salary"
                     |})
-                |> function
-                | Error err -> raise err
-                | Ok users -> Expect.equal users expected "Users can be read correctly"
+                |> fun users -> Expect.equal users expected "Users can be read correctly"
             }
 
             test "Sql.executeRow works" {
@@ -149,9 +147,7 @@ let tests =
                 |> Sql.connect
                 |> Sql.query "SELECT COUNT(*) as user_count FROM users"
                 |> Sql.executeRow (fun read -> read.int64 "user_count")
-                |> function
-                     | Ok count -> Expect.equal count 0L "Count is zero"
-                     | Error err -> raise err
+                |> fun count -> Expect.equal count 0L "Count is zero"
             }
 
             test "Sql.iter works" {
@@ -167,9 +163,7 @@ let tests =
                 |> Sql.connect
                 |> Sql.query "SELECT COUNT(*) as user_count FROM users"
                 |> Sql.iter (fun read -> count <- read.int "user_count")
-                |> function
-                    | Ok() -> Expect.equal count 0 "The count is zero"
-                    | Error err -> raise err
+                |> fun () -> Expect.equal count 0 "The count is zero"
             }
 
             test "Manual transaction handling works with Sql.executeNonQuery" {
@@ -187,13 +181,14 @@ let tests =
                 let results = ResizeArray()
 
                 for username in ["John"; "Jane"] do
-                    Sql.transaction transaction
+                    connection
+                    |> Sql.existingConnection
                     |> Sql.query "INSERT INTO users (username) VALUES(@username)"
                     |> Sql.parameters [ "@username", Sql.text username ]
                     |> Sql.executeNonQuery
                     |> results.Add
 
-                if (results.Any(fun result -> match result with | Error _ -> true | _ -> false)) then
+                if (results.Sum() <> 2) then
                     transaction.Rollback()
                 else
                     transaction.Commit()
@@ -202,9 +197,7 @@ let tests =
                 |> Sql.connect
                 |> Sql.query "SELECT COUNT(*) as user_count FROM users"
                 |> Sql.executeRow (fun read -> read.int "user_count")
-                |> function
-                    | Error error -> raise error
-                    | Ok count -> Expect.equal 2 count "There are 2 users added"
+                |> fun count -> Expect.equal 2 count "There are 2 users added"
             }
 
             test "Manual transaction handling works with Sql.executeNonQuery and can be rolled back" {
@@ -221,25 +214,25 @@ let tests =
                 use transaction = connection.BeginTransaction()
                 let results = ResizeArray()
 
-                for username in [Some "John"; Some "Jane"; None] do
-                    Sql.transaction transaction
-                    |> Sql.query "INSERT INTO users (username) VALUES(@username)"
-                    |> Sql.parameters [ "@username", Sql.textOrNone username ]
-                    |> Sql.executeNonQuery
-                    |> results.Add
+                try
 
-                if (results.Any(fun result -> match result with | Error _ -> true | _ -> false)) then
-                    transaction.Rollback()
-                else
+                    for username in [Some "John"; Some "Jane"; None] do
+                        connection
+                        |> Sql.existingConnection
+                        |> Sql.query "INSERT INTO users (username) VALUES(@username)"
+                        |> Sql.parameters [ "@username", Sql.textOrNone username ]
+                        |> Sql.executeNonQuery
+                        |> results.Add
+
                     transaction.Commit()
+                with
+                | _ -> transaction.Rollback()
 
                 db.ConnectionString
                 |> Sql.connect
                 |> Sql.query "SELECT COUNT(*) as user_count FROM users"
                 |> Sql.executeRow (fun read -> read.int "user_count")
-                |> function
-                    | Error error -> raise error
-                    | Ok count -> Expect.equal 0 count "There are 0 users added because the transaction is rolled back"
+                |> fun count -> Expect.equal 0 count "There are 0 users added because the transaction is rolled back"
             }
 
             testAsync "Sql.iterAsync works" {
@@ -252,15 +245,14 @@ let tests =
 
                 let mutable count = -1
 
-                let! result =
+                do!
                     db.ConnectionString
                     |> Sql.connect
                     |> Sql.query "SELECT COUNT(*) as user_count FROM users"
                     |> Sql.iterAsync (fun read -> count <- read.int "user_count")
+                    |> Async.AwaitTask
 
-                match result with
-                | Ok() -> Expect.equal count 0 "The count is zero"
-                | Error err -> raise err
+                Expect.equal count 0 "The count is zero"
             }
 
 
@@ -276,9 +268,7 @@ let tests =
                 |> Sql.connect
                 |> Sql.query "SELECT COUNT(*) as user_count FROM users"
                 |> Sql.executeRow (fun read -> read.int "user_count")
-                |> function
-                     | Ok count -> Expect.equal count 0 "Count is zero"
-                     | Error err -> raise err
+                |> fun count -> Expect.equal count 0 "Count is zero"
             }
 
             test "Paramater names can contain trailing spaces" {
@@ -301,7 +291,7 @@ let tests =
                         ]
                     ]
 
-                Expect.equal result (Ok [1; 1; 1;]) "paramaters can contain trailing spaces"
+                Expect.equal result [1; 1; 1] "paramaters can contain trailing spaces"
             }
 
             testAsync "Sql.executeRowAsync works" {
@@ -312,15 +302,14 @@ let tests =
                 |> Sql.executeNonQuery
                 |> ignore
 
-                let! content =
+                let! count =
                     db.ConnectionString
                     |> Sql.connect
                     |> Sql.query "SELECT COUNT(*) as user_count FROM users"
                     |> Sql.executeRowAsync (fun read -> read.int64 "user_count")
+                    |> Async.AwaitTask
 
-                match content with
-                | Ok count -> Expect.equal count 0L "Count is zero"
-                | Error err -> raise err
+                Expect.equal count 0L "Count is zero"
             }
 
             test "Sql.executeTransaction doesn't error out on parameterized queries with empty parameter sets" {
@@ -336,9 +325,7 @@ let tests =
                 |> Sql.executeTransaction [
                     "INSERT INTO users (username) VALUES (@username)", [ ]
                 ]
-                |> function
-                    | Error error -> raise error
-                    | Ok affectedRows -> Expect.equal affectedRows [0] "No rows will be affected"
+                |> fun affectedRows -> Expect.equal affectedRows [0] "No rows will be affected"
             }
 
             testAsync "Sql.executeTransactionAsync doesn't error out on parameterized queries with empty parameter sets" {
@@ -355,10 +342,9 @@ let tests =
                     |> Sql.executeTransactionAsync [
                         "INSERT INTO users (username) VALUES (@username)", [ ]
                     ]
+                    |> Async.AwaitTask
 
-                match affectedRows with
-                | Error error -> raise error
-                | Ok affectedRows -> Expect.equal affectedRows [0] "No rows will be affected"
+                Expect.equal affectedRows [0] "No rows will be affected"
             }
 
             test "Sql.executeTransaction works with existing open connection" {
@@ -395,9 +381,7 @@ let tests =
                         active = read.bool "active"
                         salary = read.decimal "salary"
                     |})
-                |> function
-                | Error err -> raise err
-                | Ok users -> Expect.equal users expected "Users can be read correctly"
+                |> fun users -> Expect.equal users expected "Users can be read correctly"
             }
 
             test "Sql.executeTransaction works with existing connection" {
@@ -433,9 +417,7 @@ let tests =
                         active = read.bool "active"
                         salary = read.decimal "salary"
                     |})
-                |> function
-                | Error err -> raise err
-                | Ok users -> Expect.equal users expected "Users can be read correctly"
+                |> fun users -> Expect.equal users expected "Users can be read correctly"
             }
 
             test "Sql.executeTransaction leaves existing connection open" {
@@ -497,9 +479,7 @@ let tests =
                 Sql.connect db.ConnectionString
                 |> Sql.query "DELETE FROM users"
                 |> Sql.executeNonQuery
-                |> function
-                    | Error error -> raise error
-                    | Ok rowsAffected -> Expect.equal 3 rowsAffected "Three entries are deleted"
+                |> fun rowsAffected -> Expect.equal 3 rowsAffected "Three entries are deleted"
             }
 
             test "Sql.executeNonQuery works with existing connection" {
@@ -524,9 +504,7 @@ let tests =
                 Sql.existingConnection connection
                 |> Sql.query "DELETE FROM users"
                 |> Sql.executeNonQuery
-                |> function
-                    | Error error -> raise error
-                    | Ok rowsAffected -> Expect.equal 3 rowsAffected "Three entries are deleted"
+                |> fun rowsAffected -> Expect.equal 3 rowsAffected "Three entries are deleted"
             }
 
             test "Sql.executeNonQuery leaves existing connection open" {
@@ -563,6 +541,7 @@ let tests =
                 Sql.connect db.ConnectionString
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
                 |> Sql.executeNonQueryAsync
+                |> Async.AwaitTask
                 |> Async.Ignore
 
             do!
@@ -574,6 +553,7 @@ let tests =
                         [ ("@username", Sql.text "third"); ("active", Sql.bit true);("salary", Sql.money 1.0M) ]
                     ]
                 ]
+                |> Async.AwaitTask
                 |> Async.Ignore
 
             let expected = [
@@ -582,7 +562,7 @@ let tests =
                 {| userId = 3; username = "third"; active = true ; salary = 1.0M |}
             ]
 
-            let! results =
+            let! users =
                 Sql.connect db.ConnectionString
                 |> Sql.query "SELECT * FROM users"
                 |> Sql.executeAsync (fun read ->
@@ -592,10 +572,9 @@ let tests =
                         active = read.bool "active"
                         salary = read.decimal "salary"
                     |})
+                |> Async.AwaitTask
 
-            match results with
-            | Error err -> raise err
-            | Ok users -> Expect.equal users expected "Users can be read correctly"
+            Expect.equal users expected "Users can be read correctly"
         }
 
         testList "Query-only parallel tests without recreating database" [
@@ -607,9 +586,7 @@ let tests =
                 |> Sql.query "SELECT @nullValue::text as output"
                 |> Sql.parameters [ "nullValue", Sql.dbnull ]
                 |> Sql.execute (fun read -> read.textOrNone "output")
-                |> function
-                    | Error error -> raise error
-                    | Ok output -> Expect.isNone output.[0] "Output was null"
+                |> fun output -> Expect.isNone output.[0] "Output was null"
             }
 
             test "Bytea roundtrip" {
@@ -620,9 +597,7 @@ let tests =
                 |> Sql.query "SELECT @manyBytes as output"
                 |> Sql.parameters [ "manyBytes", Sql.bytea input ]
                 |> Sql.execute (fun read -> read.bytea "output")
-                |> function
-                    | Error error -> raise error
-                    | Ok output -> Expect.equal input output.[0] "Check bytes read from database are the same sent"
+                |> fun output -> Expect.equal input output.[0] "Check bytes read from database are the same sent"
             }
 
             test "bit/bool roundtrip" {
@@ -632,9 +607,7 @@ let tests =
                 |> Sql.query "SELECT @logical as output"
                 |> Sql.parameters [ "logical", Sql.bit true ]
                 |> Sql.execute (fun read -> read.bool "output")
-                |> function
-                    | Error error -> raise error
-                    | Ok output -> Expect.equal true output.[0] "Check bytes read from database are the same sent"
+                |> fun output -> Expect.equal true output.[0] "Check bytes read from database are the same sent"
             }
 
             test "Uuid roundtrip" {
@@ -645,9 +618,7 @@ let tests =
                 |> Sql.query "SELECT @uuid_input as output"
                 |> Sql.parameters [ "uuid_input", Sql.uuid id ]
                 |> Sql.execute (fun read -> read.uuid "output")
-                |> function
-                    | Error error -> raise error
-                    | Ok output -> Expect.equal id output.[0] "Check uuid read from database is the same sent"
+                |> fun output -> Expect.equal id output.[0] "Check uuid read from database is the same sent"
             }
 
             test "Money roundtrip with @ sign" {
@@ -657,9 +628,7 @@ let tests =
                 |> Sql.query "SELECT @money_input::money as value"
                 |> Sql.parameters [ "@money_input", Sql.money 12.5M ]
                 |> Sql.execute (fun read -> read.decimal "value")
-                |> function
-                    | Error error -> raise error
-                    | Ok money -> Expect.equal money.[0] 12.5M "Check money as decimal read from database is the same sent"
+                |> fun money -> Expect.equal money.[0] 12.5M "Check money as decimal read from database is the same sent"
             }
 
             test "DateTimeOffset roundtrip when input is UTC" {
@@ -672,9 +641,7 @@ let tests =
                 |> Sql.query "SELECT @timestamp::timestamptz as value"
                 |> Sql.parameters [ "@timestamp", Sql.timestamptz value ]
                 |> Sql.executeRow (fun read -> read.datetimeOffset "value")
-                |> function
-                    | Error error -> raise error
-                    | Ok timestamp -> Expect.equal (timestamp.ToUnixTimeSeconds()) (value.ToUnixTimeSeconds()) "The values are the same"
+                |> fun timestamp -> Expect.equal (timestamp.ToUnixTimeSeconds()) (value.ToUnixTimeSeconds()) "The values are the same"
             }
 
             test "DateTimeOffset roundtrip when input is local" {
@@ -687,9 +654,7 @@ let tests =
                 |> Sql.query "SELECT @timestamp::timestamptz as value"
                 |> Sql.parameters [ "@timestamp", Sql.timestamptz value ]
                 |> Sql.executeRow (fun read -> read.datetimeOffset "value")
-                |> function
-                    | Error error -> raise error
-                    | Ok timestamp -> Expect.equal (timestamp.ToUnixTimeSeconds()) (value.ToUnixTimeSeconds()) "The values are the same"
+                |> fun timestamp -> Expect.equal (timestamp.ToUnixTimeSeconds()) (value.ToUnixTimeSeconds()) "The values are the same"
             }
 
             test "uuid_generate_v4()" {
@@ -699,9 +664,8 @@ let tests =
                 |> Sql.query "SELECT uuid_generate_v4() as id"
                 |> Sql.execute (fun read -> read.uuid "id")
                 |> function
-                    | Error error -> raise error
-                    | Ok [ uuid ] ->  Expect.isNotNull (uuid.ToString()) "Check database generates an UUID"
-                    | Ok _ -> failwith "Should not happpen"
+                    | [ uuid ] ->  Expect.isNotNull (uuid.ToString()) "Check database generates an UUID"
+                    | _ -> failwith "Should not happpen"
             }
 
             test "String option roundtrip" {
@@ -717,12 +681,10 @@ let tests =
                     |> Sql.execute (fun read -> read.textOrNone "first", read.textOrNone "second")
 
                 match row with
-                | Ok [ (Some output, None) ] ->
+                | [ (Some output, None) ] ->
                     Expect.equal a (Some output) "Check Option value read from database is the same as the one sent"
-                | Ok (_) ->
+                | _ ->
                     failwith "Unexpected results"
-                | Error error ->
-                    raise error
             }
 
             test "String option roundtrip with existing connection" {
@@ -739,12 +701,10 @@ let tests =
                     |> Sql.execute (fun read -> read.textOrNone "first", read.textOrNone "second")
 
                 match row with
-                | Ok [ (Some output, None) ] ->
+                | [ (Some output, None) ] ->
                     Expect.equal a (Some output) "Check Option value read from database is the same as the one sent"
-                | Ok (_) ->
+                | _ ->
                     failwith "Unexpected results"
-                | Error error ->
-                    raise error
             }
 
             test "String option roundtrip leaves existing connection open" {
@@ -797,9 +757,7 @@ let tests =
                     { test_id = 3; test_name = "third test" }
                 ]
 
-                match table with
-                | Error err -> raise err
-                | Ok table -> Expect.equal expected table "Check all rows from `fsharp_test` table using a Reader"
+                Expect.equal expected table "Check all rows from `fsharp_test` table using a Reader"
             }
 
             test "Sql.execute with existing connection" {
@@ -814,6 +772,7 @@ let tests =
                         ]
                     ]
                     |> ignore
+
                 use db = buildDatabase()
                 use connection = new NpgsqlConnection(db.ConnectionString)
                 connection.Open()
@@ -834,9 +793,7 @@ let tests =
                     { test_id = 3; test_name = "third test" }
                 ]
 
-                match table with
-                | Error err -> raise err
-                | Ok table -> Expect.equal expected table "Check all rows from `fsharp_test` table using a Reader"
+                Expect.equal expected table "Check all rows from `fsharp_test` table using a Reader"
             }
 
             test "Create table with Jsonb data" {
@@ -853,15 +810,13 @@ let tests =
                 let connection : string = db.ConnectionString
                 seedDatabase connection inputJson
 
-                let dbJson =
+                let json =
                     connection
                     |> Sql.connect
                     |> Sql.query "SELECT data ->> 'property' as property FROM data_with_jsonb"
                     |> Sql.execute(fun read -> read.text "property")
 
-                match dbJson with
-                | Error error -> raise error
-                | Ok json -> Expect.equal json.[0] jsonData "Check json read from database"
+                Expect.equal json.[0] jsonData "Check json read from database"
             }
 
             test "Create table with Jsonb data with existing connection" {
@@ -885,51 +840,8 @@ let tests =
                     |> Sql.query "SELECT data ->> 'property' as property FROM data_with_jsonb"
                     |> Sql.execute(fun read -> read.text "property")
 
-                match dbJson with
-                | Error error -> raise error
-                | Ok json -> Expect.equal json.[0] jsonData "Check json read from database"
+                Expect.equal dbJson.[0] jsonData "Check json read from database"
             }
-
-            test "Infinity time" {
-                let seedDatabase (connection: string) =
-                    connection
-                    |> Sql.connect
-                    |> Sql.query "INSERT INTO timestampz_test (version, date1, date2) values (1, 'now', 'infinity')"
-                    |> Sql.executeNonQuery
-                    |> ignore
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
-                seedDatabase connection
-
-                let dataTable =
-                    connection
-                    |> Sql.connect
-                    |> Sql.query "SELECT * FROM timestampz_test"
-                    |> Sql.execute (fun read -> read.timestamptz "date2")
-
-                Expect.isOk dataTable "Should be able to get results"
-            }
-
-            //test "Handle infinity connection" {
-            //    let seedDatabase (connection: string) =
-            //        connection
-            //        |> Sql.connect
-            //        |> Sql.query "INSERT INTO timestampz_test (version, date1, date2) values (1, 'now', 'infinity')"
-            //        |> Sql.executeNonQuery
-            //        |> ignore
-            //    use db = buildInfinityDatabase()
-            //    let connection : string = db.ConnectionString
-            //    seedDatabase connection
-            //    let dataTable =
-            //        connection
-            //        |> Sql.connect
-            //        |> Sql.query "SELECT date2 FROM timestampz_test"
-            //        |> Sql.executeSingleRow (fun read -> read.timestamptz "date2")
-//
-            //    match dataTable with
-            //    | Error error -> raise error
-            //    | Ok timestamp -> Expect.isTrue timestamp.IsInfinity "Returned timestamp is infinity"
-            //}
 
             test "Handle String Array" {
                 let getString () =
@@ -969,9 +881,7 @@ let tests =
                     { id = 3; values = c }
                 ]
 
-                match table with
-                | Error error -> raise error
-                | Ok values -> Expect.equal expected values "All rows from `string_array_test` table"
+                Expect.equal expected table "All rows from `string_array_test` table"
             }
 
             test "Handle String Array with existing connection" {
@@ -1013,9 +923,7 @@ let tests =
                     { id = 3; values = c }
                 ]
 
-                match table with
-                | Error error -> raise error
-                | Ok values -> Expect.equal expected values "All rows from `string_array_test` table"
+                Expect.equal expected table "All rows from `string_array_test` table"
             }
 
             test "Handle int Array" {
@@ -1053,9 +961,7 @@ let tests =
                     { id = 3; integers = c }
                 ]
 
-                match table with
-                | Error error -> raise error
-                | Ok table -> Expect.equal expected table  "All rows from `int_array_test` table"
+                Expect.equal expected table  "All rows from `int_array_test` table"
             }
 
             test "Handle int Array with existing connection" {
@@ -1094,9 +1000,7 @@ let tests =
                     { id = 3; integers = c }
                 ]
 
-                match table with
-                | Error error -> raise error
-                | Ok table -> Expect.equal expected table  "All rows from `int_array_test` table"
+                Expect.equal expected table  "All rows from `int_array_test` table"
             }
 
             test "Handle UUID Array" {
@@ -1135,9 +1039,7 @@ let tests =
                     { id = 3; guids = c }
                 ]
 
-                match table with
-                | Error error -> raise error
-                | Ok values -> Expect.equal expected values "All rows from `uuid_array_test` table"
+                Expect.equal expected table "All rows from `uuid_array_test` table"
             }
 
             test "Handle NpgsqlPoint" {
@@ -1175,9 +1077,7 @@ let tests =
                     { id = 3; point = c}
                 ]
 
-                match table with
-                | Error error -> raise error
-                | Ok values -> Expect.equal expected values "All rows from `point_test` table"
+                Expect.equal expected table "All rows from `point_test` table"
             }
 
             test "Handle nullable NpgsqlPoint" {
@@ -1214,77 +1114,164 @@ let tests =
                     { id = 3; nullablepoint = None }
                 ]
 
-                match table with
-                | Error error -> raise error
-                | Ok values -> Expect.equal expected values "All rows from `point_test` table"
+                Expect.equal expected table "All rows from `point_test` table"
             }
+
+            test "Sql returned types" {
+                //Int
+                let data = 1
+                let value = Sql.int data
+                Expect.equal (SqlValue.Int data) value "Unexpected value Sql.int"
+
+                let value = Sql.intOrNone (Some data)
+                Expect.equal (SqlValue.Int data) value "Unexpected value Sql.intOrNone (Some)"
+
+                let value = Sql.intOrNone None
+                Expect.equal SqlValue.Null value "Unexpected value Sql.intOrNone (None)"
+
+                let value = Sql.intOrValueNone (ValueSome data)
+                Expect.equal (SqlValue.Int data) value "Unexpected value Sql.intOrValueNone (ValueSome)"
+
+                let value = Sql.intOrValueNone ValueNone
+                Expect.equal SqlValue.Null value "Unexpected value Sql.intOrValueNone (ValueNone)"
+
+                //String
+                let data = "str"
+                let value = Sql.string data
+                Expect.equal (SqlValue.String data) value "Unexpected value Sql.string"
+
+                let value = Sql.stringOrNone (Some data)
+                Expect.equal (SqlValue.String data) value "Unexpected value Sql.stringOrNone (Some)"
+
+                let value = Sql.stringOrNone None
+                Expect.equal SqlValue.Null value "Unexpected value Sql.stringOrNone (None)"
+
+                let value = Sql.stringOrValueNone (ValueSome data)
+                Expect.equal (SqlValue.String data) value "Unexpected value Sql.stringOrValueNone (ValueSome)"
+
+                let value = Sql.stringOrValueNone ValueNone
+                Expect.equal SqlValue.Null value "Unexpected value Sql.stringOrValueNone (ValueNone)"
+
+                //Text
+                let data = "text"
+                let value = Sql.text data
+                Expect.equal (SqlValue.String data) value "Unexpected value Sql.text"
+
+                let value = Sql.textOrNone (Some data)
+                Expect.equal (SqlValue.String data) value "Unexpected value Sql.textOrNone (Some)"
+
+                let value = Sql.textOrNone None
+                Expect.equal SqlValue.Null value "Unexpected value Sql.textOrNone (None)"
+
+                let value = Sql.textOrValueNone (ValueSome data)
+                Expect.equal (SqlValue.String data) value "Unexpected value Sql.textOrValueNone (ValueSome)"
+
+                let value = Sql.textOrValueNone ValueNone
+                Expect.equal SqlValue.Null value "Unexpected value Sql.textOrValueNone (ValueNone)"
+
+                //bit
+                let data = true
+                let value = Sql.bit data
+                Expect.equal (SqlValue.Bit data) value "Unexpected value Sql.bit"
+
+                let value = Sql.bitOrNone (Some data)
+                Expect.equal (SqlValue.Bit data) value "Unexpected value Sql.bitOrNone (Some)"
+
+                let value = Sql.bitOrNone None
+                Expect.equal SqlValue.Null value "Unexpected value Sql.bitOrNone (None)"
+
+                let value = Sql.bitOrValueNone (ValueSome data)
+                Expect.equal (SqlValue.Bit data) value "Unexpected value Sql.bitOrValueNone (ValueSome)"
+
+                let value = Sql.bitOrValueNone ValueNone
+                Expect.equal SqlValue.Null value "Unexpected value Sql.bitOrValueNone (ValueNone)"
+
+                //bool
+                let data = true
+                let value = Sql.bool data
+                Expect.equal (SqlValue.Bool data) value "Unexpected value Sql.bool"
+
+                let value = Sql.boolOrNone (Some data)
+                Expect.equal (SqlValue.Bool data) value "Unexpected value Sql.boolOrNone (Some)"
+
+                let value = Sql.boolOrNone None
+                Expect.equal SqlValue.Null value "Unexpected value Sql.boolOrNone (None)"
+
+                let value = Sql.boolOrValueNone (ValueSome data)
+                Expect.equal (SqlValue.Bool data) value "Unexpected value Sql.boolOrValueNone (ValueSome)"
+
+                let value = Sql.boolOrValueNone ValueNone
+                Expect.equal SqlValue.Null value "Unexpected value Sql.boolOrValueNone (ValueNone)"
+
+                //double
+                let data = 7.
+                let value = Sql.double data
+                Expect.equal (SqlValue.Number data) value "Unexpected value Sql.double"
+
+                let value = Sql.doubleOrNone (Some data)
+                Expect.equal (SqlValue.Number data) value "Unexpected value Sql.doubleOrNone (Some)"
+
+                let value = Sql.doubleOrNone None
+                Expect.equal SqlValue.Null value "Unexpected value Sql.doubleOrNone (None)"
+
+                let value = Sql.doubleOrValueNone (ValueSome data)
+                Expect.equal (SqlValue.Number data) value "Unexpected value Sql.doubleOrValueNone (ValueSome)"
+
+                let value = Sql.doubleOrValueNone ValueNone
+                Expect.equal SqlValue.Null value "Unexpected value Sql.doubleOrValueNone (ValueNone)"
+
+                //decimal
+                let data = 9M
+                let value = Sql.decimal data
+                Expect.equal (SqlValue.Decimal data) value "Unexpected value Sql.decimal"
+
+                let value = Sql.decimalOrNone (Some data)
+                Expect.equal (SqlValue.Decimal data) value "Unexpected value Sql.decimalOrNone (Some)"
+
+                let value = Sql.decimalOrNone None
+                Expect.equal SqlValue.Null value "Unexpected value Sql.decimalOrNone (None)"
+
+                let value = Sql.decimalOrValueNone (ValueSome data)
+                Expect.equal (SqlValue.Decimal data) value "Unexpected value Sql.decimalOrValueNone (ValueSome)"
+
+                let value = Sql.decimalOrValueNone ValueNone
+                Expect.equal SqlValue.Null value "Unexpected value Sql.decimalOrValueNone (ValueNone)"
+
+                //timestamp
+                let data = DateTime(2021, 02, 28)
+                let value = Sql.timestamp data
+                Expect.equal (SqlValue.Timestamp data) value "Unexpected value Sql.timestamp"
+
+                let value = Sql.timestampOrNone (Some data)
+                Expect.equal (SqlValue.Timestamp data) value "Unexpected value Sql.timestampOrNone (Some)"
+
+                let value = Sql.timestampOrNone None
+                Expect.equal SqlValue.Null value "Unexpected value Sql.timestampOrNone (None)"
+
+                let value = Sql.timestampOrValueNone (ValueSome data)
+                Expect.equal (SqlValue.Timestamp data) value "Unexpected value Sql.timestampOrValueNone (ValueSome)"
+
+                let value = Sql.timestampOrValueNone ValueNone
+                Expect.equal SqlValue.Null value "Unexpected value Sql.timestampOrValueNone (ValueNone)"
+            }
+
         ] |> testSequenced
 
     ]
-
-
-module Result =
-    let throwIfError<'t,'terr when 'terr :> exn> (x: Result<'t,'terr>) =
-        match x with
-        | Ok ok -> ok
-        | Error e -> raise e
-
-let dummyRead = ignore
-let testable f x =
-    f x |> Result.throwIfError |> ignore
-let asyncTestable f x =
-    f x |> Async.RunSynchronously |> Result.throwIfError |> ignore
-
-let missingQueryTests =
-        [ "Sql.execute", testable <| Sql.execute dummyRead
-          "Sql.iter", testable <| Sql.iter dummyRead
-          "Sql.executeRow", testable <| Sql.executeRow dummyRead
-          "Sql.executeNonQuery", testable Sql.executeNonQuery
-          "Sql.executeAsync", asyncTestable <| Sql.executeAsync dummyRead
-          "Sql.iterAsync", asyncTestable <| Sql.iterAsync dummyRead
-          "Sql.executeNonQueryAsync", asyncTestable Sql.executeNonQueryAsync ]
-        |> List.map
-            (fun (name, func) ->
-                test (sprintf "%s fails with MissingQueryException for missing query" name) {
-                    use db = buildDatabase()
-
-                    Expect.throwsT<MissingQueryException>
-                        (fun () -> db.ConnectionString |> Sql.connect |> func)
-                        "Check missing query fails with expected exception type"
-                })
-
-let noResultsTests =
-    [ "Sql.executeRow", testable <| Sql.executeRow dummyRead
-      "Sql.executeRowAsync", asyncTestable <| Sql.executeRowAsync dummyRead]
-    |> List.map
-        (fun (name, func) ->
-            test (sprintf "%s fails with NoResultsException if no results are returned" name) {
-                use db = buildDatabase()
-
-                Expect.throwsT<NoResultsException>
-                    (fun () ->
-                         db.ConnectionString
-                         |> Sql.connect
-                         |> Sql.query "SELECT * FROM fsharp_test WHERE test_id = 9999"
-                         |> func)
-                    "Check no results fails with NoResultsException"
-           })
 
 let unknownColumnTest =
     test "RowReader raises UnknownColumnException when trying to read unknown column" {
         use db = buildDatabase()
 
-        Expect.throwsT<UnknownColumnException>
+        Expect.throws
             (fun () ->
                  db.ConnectionString
                  |> Sql.connect
                  |> Sql.query "SELECT * FROM UNNEST(ARRAY ['hello', 'world'])"
                  |> Sql.executeRow (fun read -> read.string "not_a_real_column")
-                 |> Result.throwIfError
                  |> ignore)
             "Check invalid column fails with expected exception type"
     }
 
-let errorTests =
-    testList "Custom Exception tests" ( unknownColumnTest::missingQueryTests@noResultsTests )
-let allTests = testList "All tests" [ tests; errorTests ]
+
+let allTests = testList "Npgsql.FSharp.Tasks" [ tests; unknownColumnTest ]

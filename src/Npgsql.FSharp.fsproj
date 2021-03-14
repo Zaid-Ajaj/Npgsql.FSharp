@@ -7,18 +7,16 @@
     <PackageIconUrl></PackageIconUrl>
     <PackageTags>fsharp;postgres;sql;ngpsql</PackageTags>
     <Authors>Zaid Ajaj</Authors>
-    <Version>3.13.0</Version>
+    <Version>4.0.0</Version>
     <TargetFrameworks>netstandard2.0</TargetFrameworks>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <LangVersion>latest</LangVersion>
-    <PackageReleaseNotes>Add support for ValueOption</PackageReleaseNotes>
+    <PackageReleaseNotes>Major release v4</PackageReleaseNotes>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="OptionWorkflow.fs" />
     <Compile Include="Common.fs" />
     <Compile Include="PostgresUri.fs" />
     <Compile Include="Npgsql.FSharp.fs" />
-    <Compile Include="Npgsql.FSharp.Tasks.fs" />
   </ItemGroup>
 
   <Import Project="..\.paket\Paket.Restore.targets" />

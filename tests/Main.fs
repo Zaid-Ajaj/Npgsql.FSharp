@@ -2,7 +2,6 @@ open Expecto
 
 let allTests = testList "All tests" [
     NgpsqlFSharpTests.allTests
-    NgpsqlFSharpTasksTests.allTests
 ]
 
 [<EntryPoint>]

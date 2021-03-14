@@ -1,8 +1,10 @@
-# Npgsql.FSharp [![Nuget](https://img.shields.io/nuget/v/Npgsql.FSharp.svg?colorB=green)](https://www.nuget.org/packages/Npgsql.FSharp) [![Build Status](https://travis-ci.com/Zaid-Ajaj/Npgsql.FSharp.svg?branch=master)](https://travis-ci.com/Zaid-Ajaj/Npgsql.FSharp)
+# Npgsql.FSharp [![Nuget](https://img.shields.io/nuget/v/Npgsql.FSharp.svg?colorB=green)](https://www.nuget.org/packages/Npgsql.FSharp)
 
 Thin F#-friendly layer for the [Npgsql](https://github.com/npgsql/npgsql) data provider for PostgreSQL.
 
 For an optimal developer experience, this library is made to work with [Npgsql.FSharp.Analyzer](https://github.com/Zaid-Ajaj/Npgsql.FSharp.Analyzer) which is a F# analyzer that will verify the query syntax and perform type-checking against the parameters and the types of the columns from the result set.
+
+Read the full documentation at [zaid-ajaj.github.io/npgsql.fsharp](zaid-ajaj.github.io/npgsql.fsharp)
 
 ### Install from nuget
 ```bash
@@ -13,19 +15,9 @@ dotnet add package Npgsql.FSharp
 paket add Npgsql.FSharp --group Main
 ```
 
-### Choose you namespace
-
-This package comes in two flavors, available through _mutually exclusive_ namespaces:
- - `Npgsql.FSharp`: which exposes an API that works best with F# `async`
- - `Npgsql.FSharp.Tasks`: which exposes the _same_ API that works best with tasks
-
-If you don't know which namespace you need, go for `Npgsql.FSharp.Tasks` because it is less opinionated, works out of the box with `Task<'t>` and has less friction than the `Npgsql.FSharp` namespace.
-
-> In the next v4.x release, `Npgsql.FSharp.Tasks` will probably becomes the default.
-
 ### Start using the library
 
-First thing to do is aquire your connection string somehow. For example using environment variables, a hardcoded value or using the builder API
+First thing to do is aquire your connection string some how. For example using environment variables, a hardcoded value or using the builder API
 
 ```fs
 // (1) from environment variables
@@ -57,7 +49,7 @@ type User = {
     LastName: string
 }
 
-let getAllUsers (connectionString: string) =
+let getAllUsers (connectionString: string) : User list =
     connectionString
     |> Sql.connect
     |> Sql.query "SELECT * FROM users"
@@ -155,7 +147,7 @@ connectionString
 ### `Sql.executeNonQuery`: Returns number of affected rows from statement
 Use the function `Sql.executeNonQuery` or its async counter part to get the number of affected rows from a query. Like always, the function is safe by default and returns `Result<int, exn>` as output.
 ```fs
-let getAllUsers() : Result<int, exn> =
+let getAllUsers() =
     defaultConnection
     |> Sql.connectFromConfig
     |> Sql.query "DELETE FROM users WHERE is_active = @is_active"
@@ -172,7 +164,6 @@ let filmTitles(connectionString: string) =
     |> Sql.connect
     |> Sql.query "SELECT title FROM film"
     |> Sql.iter (fun read -> titles.Add(read.text "title"))
-    |> ignore
 
     titles
 ```
@@ -275,7 +266,8 @@ use transaction = connection.BeginTransaction()
 // 3) run SQL commands against the transaction
 for number in [1 .. 10] do
     let result =
-        Sql.transaction transaction
+        connection
+        |> Sql.existingConnection
         |> Sql.query "INSERT INTO table (columnName) VALUES (@value)"
         |> Sql.parameters [ "@value", Sql.int 42 ]
         |> Sql.executeNonQuery
@@ -285,8 +277,6 @@ for number in [1 .. 10] do
 // 4) commit the transaction, rollback or do whatever you want
 transaction.Commit()
 ```
-The magic happens when you provide the transaction via the `Sql.transaction` function.
-
 If you don't like creating the connection yourself because you want to use the builder API, you can instead let the library create the connection as follows:
 ```fs
 use connection =

@@ -6,6 +6,8 @@ open NpgsqlTypes
 open System.Threading
 open System.Data
 open System.Security.Cryptography.X509Certificates
+open FSharp.Control.Tasks
+open System.Threading.Tasks
 
 /// Specifies how to manage SSL.
 [<RequireQualifiedAccess>]
@@ -28,7 +30,6 @@ module Sql =
     type ExecutionTarget =
         | ConnectionString of string
         | Connection of NpgsqlConnection
-        | Transaction of NpgsqlTransaction
         | Empty
 
     type ConnectionStringBuilder = private {
@@ -165,10 +166,6 @@ module Sql =
 
     /// Uses an existing connection to execute SQL commands against
     let existingConnection (connection: NpgsqlConnection) = { defaultProps() with ExecutionTarget = Connection connection }
-    /// Uses an existing transaction to execute the SQL commands against
-    let transaction (existingTransaction: NpgsqlTransaction) =
-        { defaultProps() with ExecutionTarget = Transaction existingTransaction }
-
     /// Configures the SQL query to execute
     let query (sql: string) props = { props with SqlQuery = [sql] }
     let func (sql: string) props = { props with SqlQuery = [sql]; IsFunction = true }
@@ -190,14 +187,12 @@ module Sql =
             connection
 
         | Connection existingConnection -> existingConnection
-        | Transaction transaction -> transaction.Connection
         | Empty -> failwith "Could not create a connection from empty parameters."
 
     let private makeCommand (props: SqlProps) (connection: NpgsqlConnection) =
         match props.ExecutionTarget with
         | ConnectionString _
         | Connection _ -> new NpgsqlCommand(List.head props.SqlQuery, connection)
-        | Transaction transaction -> new NpgsqlCommand(List.head props.SqlQuery, connection, transaction)
         | Empty -> failwith "Cannot create command from an empty execution target"
 
     let private populateRow (cmd: NpgsqlCommand) (row: (string * SqlValue) list) =
@@ -248,14 +243,55 @@ module Sql =
         populateRow cmd props.Parameters
 
     let executeTransaction queries (props: SqlProps) =
+        if List.isEmpty queries
+        then [ ]
+        else
+        let connection = createConnection props
         try
+            if not (connection.State.HasFlag ConnectionState.Open)
+            then connection.Open()
+            use transaction = connection.BeginTransaction()
+            let affectedRowsByQuery = ResizeArray<int>()
+            for (query, parameterSets) in queries do
+                if List.isEmpty parameterSets
+                then
+                    use command = new NpgsqlCommand(query, connection, transaction)
+                    // detect whether the command has parameters
+                    // if that is the case, then don't execute it
+                    NpgsqlCommandBuilder.DeriveParameters(command)
+                    if command.Parameters.Count = 0 then
+                        let affectedRows = command.ExecuteNonQuery()
+                        affectedRowsByQuery.Add affectedRows
+                    else
+                        // parameterized query won't execute
+                        // when the parameter set is empty
+                        affectedRowsByQuery.Add 0
+                else
+                    for parameterSet in parameterSets do
+                        use command = new NpgsqlCommand(query, connection, transaction)
+                        populateRow command parameterSet
+                        let affectedRows = command.ExecuteNonQuery()
+                        affectedRowsByQuery.Add affectedRows
+
+            transaction.Commit()
+            List.ofSeq affectedRowsByQuery
+        finally
+            match props.ExecutionTarget with
+            | ConnectionString _ -> connection.Dispose()
+            | _ ->
+                // leave connections open
+                // when provided from outside
+                ()
+
+    let executeTransactionAsync queries (props: SqlProps) =
+        task {
             if List.isEmpty queries
-            then Ok [ ]
+            then return [ ]
             else
             let connection = createConnection props
             try
                 if not (connection.State.HasFlag ConnectionState.Open)
-                then connection.Open()
+                then do! connection.OpenAsync props.CancellationToken
                 use transaction = connection.BeginTransaction()
                 let affectedRowsByQuery = ResizeArray<int>()
                 for (query, parameterSets) in queries do
@@ -265,7 +301,7 @@ module Sql =
                         // if that is the case, then don't execute it
                         NpgsqlCommandBuilder.DeriveParameters(command)
                         if command.Parameters.Count = 0 then
-                            let affectedRows = command.ExecuteNonQuery()
+                            let! affectedRows = command.ExecuteNonQueryAsync props.CancellationToken
                             affectedRowsByQuery.Add affectedRows
                         else
                             // parameterized query won't execute
@@ -275,263 +311,177 @@ module Sql =
                         for parameterSet in parameterSets do
                             use command = new NpgsqlCommand(query, connection, transaction)
                             populateRow command parameterSet
-                            let affectedRows = command.ExecuteNonQuery()
+                            let! affectedRows = command.ExecuteNonQueryAsync props.CancellationToken
                             affectedRowsByQuery.Add affectedRows
-                transaction.Commit()
-                Ok (List.ofSeq affectedRowsByQuery)
+                do! transaction.CommitAsync props.CancellationToken
+                return List.ofSeq affectedRowsByQuery
             finally
                 match props.ExecutionTarget with
                 | ConnectionString _ -> connection.Dispose()
-                | _ ->
-                    // leave connections open
-                    // when provided from outside
-                    ()
-        with
-        | error -> Error error
-
-    let executeTransactionAsync queries (props: SqlProps) =
-        async {
-            try
-                let! token = Async.CancellationToken
-                use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
-                let mergedToken = mergedTokenSource.Token
-                if List.isEmpty queries
-                then return Ok [ ]
-                else
-                let connection = createConnection props
-                try
-                    if not (connection.State.HasFlag ConnectionState.Open)
-                    then do! Async.AwaitTask (connection.OpenAsync mergedToken)
-                    use transaction = connection.BeginTransaction ()
-                    let affectedRowsByQuery = ResizeArray<int>()
-                    for (query, parameterSets) in queries do
-                        if List.isEmpty parameterSets then
-                            use command = new NpgsqlCommand(query, connection, transaction)
-                            // detect whether the command has parameters
-                            // if that is the case, then don't execute it
-                            NpgsqlCommandBuilder.DeriveParameters(command)
-                            if command.Parameters.Count = 0 then
-                                let! affectedRows = Async.AwaitTask (command.ExecuteNonQueryAsync mergedToken)
-                                affectedRowsByQuery.Add affectedRows
-                            else
-                                // parameterized query won't execute
-                                // when the parameter set is empty
-                                affectedRowsByQuery.Add 0
-                        else
-                            for parameterSet in parameterSets do
-                                use command = new NpgsqlCommand(query, connection, transaction)
-                                populateRow command parameterSet
-                                let! affectedRows = Async.AwaitTask (command.ExecuteNonQueryAsync mergedToken)
-                                affectedRowsByQuery.Add affectedRows
-                    do! Async.AwaitTask(transaction.CommitAsync mergedToken)
-                    return Ok (List.ofSeq affectedRowsByQuery)
-                finally
-                    match props.ExecutionTarget with
-                    | ConnectionString _ -> connection.Dispose()
-                    | _ -> ()
-            with error ->
-                return Error error
+                | _ -> ()
         }
 
-    let execute (read: RowReader -> 't) (props: SqlProps) : Result<'t list, exn> =
+    let execute (read: RowReader -> 't) (props: SqlProps) : 't list =
+        if List.isEmpty props.SqlQuery
+        then raise <| MissingQueryException "No query provided to execute. Please use Sql.query"
+        let connection = createConnection props
         try
+            if not (connection.State.HasFlag ConnectionState.Open)
+            then connection.Open()
+            use command = makeCommand props connection
+            do populateCmd command props
+            if props.NeedPrepare then command.Prepare()
+            use reader = command.ExecuteReader()
+            let postgresReader = unbox<NpgsqlDataReader> reader
+            let rowReader = RowReader(postgresReader)
+            let result = ResizeArray<'t>()
+            while reader.Read() do result.Add (read rowReader)
+            List.ofSeq result
+        finally
+            match props.ExecutionTarget with
+            | ConnectionString _ -> connection.Dispose()
+            | _ -> ()
+
+    let iter (perform: RowReader -> unit) (props: SqlProps) : unit =
+        if List.isEmpty props.SqlQuery
+        then raise <| MissingQueryException "No query provided to execute. Please use Sql.query"
+        let connection = createConnection props
+        try
+            if not (connection.State.HasFlag ConnectionState.Open)
+            then connection.Open()
+            use command = makeCommand props connection
+            do populateCmd command props
+            if props.NeedPrepare then command.Prepare()
+            use reader = command.ExecuteReader()
+            let postgresReader = unbox<NpgsqlDataReader> reader
+            let rowReader = RowReader(postgresReader)
+            while reader.Read() do perform rowReader
+        finally
+            match props.ExecutionTarget with
+            | ConnectionString _ -> connection.Dispose()
+            | _ -> ()
+
+    let executeRow (read: RowReader -> 't) (props: SqlProps) : 't =
+        if List.isEmpty props.SqlQuery
+        then raise <| MissingQueryException "No query provided to execute. Please use Sql.query"
+        let connection = createConnection props
+        try
+            if not (connection.State.HasFlag ConnectionState.Open)
+            then connection.Open()
+            use command = makeCommand props connection
+            do populateCmd command props
+            if props.NeedPrepare then command.Prepare()
+            use reader = command.ExecuteReader()
+            let postgresReader = unbox<NpgsqlDataReader> reader
+            let rowReader = RowReader(postgresReader)
+            if reader.Read()
+            then read rowReader
+            else raise <| NoResultsException "Expected at least one row to be returned from the result set. Instead it was empty"
+        finally
+            match props.ExecutionTarget with
+            | ConnectionString _ -> connection.Dispose()
+            | _ -> ()
+
+    let executeAsync (read: RowReader -> 't) (props: SqlProps) : Task<'t list> =
+        task {
             if List.isEmpty props.SqlQuery
             then raise <| MissingQueryException "No query provided to execute. Please use Sql.query"
             let connection = createConnection props
             try
                 if not (connection.State.HasFlag ConnectionState.Open)
-                then connection.Open()
+                then do! connection.OpenAsync(props.CancellationToken)
                 use command = makeCommand props connection
                 do populateCmd command props
                 if props.NeedPrepare then command.Prepare()
-                use reader = command.ExecuteReader()
+                use! reader = command.ExecuteReaderAsync props.CancellationToken
                 let postgresReader = unbox<NpgsqlDataReader> reader
                 let rowReader = RowReader(postgresReader)
                 let result = ResizeArray<'t>()
                 while reader.Read() do result.Add (read rowReader)
-                Ok (List.ofSeq result)
+                return List.ofSeq result
             finally
                 match props.ExecutionTarget with
                 | ConnectionString _ -> connection.Dispose()
                 | _ -> ()
-        with error ->
-            Error error
+        }
 
-    let iter (perform: RowReader -> unit) (props: SqlProps) : Result<unit, exn> =
-        try
+    let iterAsync (perform: RowReader -> unit) (props: SqlProps) : Task =
+        unitTask {
             if List.isEmpty props.SqlQuery
             then raise <| MissingQueryException "No query provided to execute. Please use Sql.query"
             let connection = createConnection props
             try
                 if not (connection.State.HasFlag ConnectionState.Open)
-                then connection.Open()
+                then do! connection.OpenAsync(props.CancellationToken)
                 use command = makeCommand props connection
                 do populateCmd command props
                 if props.NeedPrepare then command.Prepare()
-                use reader = command.ExecuteReader()
+                use! reader = command.ExecuteReaderAsync(props.CancellationToken)
                 let postgresReader = unbox<NpgsqlDataReader> reader
                 let rowReader = RowReader(postgresReader)
                 while reader.Read() do perform rowReader
-                Ok ()
             finally
                 match props.ExecutionTarget with
                 | ConnectionString _ -> connection.Dispose()
                 | _ -> ()
-        with error ->
-            Error error
+        }
 
-    let executeRow (read: RowReader -> 't) (props: SqlProps) : Result<'t, exn> =
-        try
+    let executeRowAsync (read: RowReader -> 't) (props: SqlProps) : Task<'t> =
+        task {
             if List.isEmpty props.SqlQuery
             then raise <| MissingQueryException "No query provided to execute. Please use Sql.query"
             let connection = createConnection props
             try
                 if not (connection.State.HasFlag ConnectionState.Open)
-                then connection.Open()
+                then do! connection.OpenAsync(props.CancellationToken)
                 use command = makeCommand props connection
                 do populateCmd command props
                 if props.NeedPrepare then command.Prepare()
-                use reader = command.ExecuteReader()
+                use! reader = command.ExecuteReaderAsync props.CancellationToken
                 let postgresReader = unbox<NpgsqlDataReader> reader
                 let rowReader = RowReader(postgresReader)
                 if reader.Read()
-                then Ok (read rowReader)
-                else raise <| NoResultsException "Expected at least one row to be returned from the result set. Instead it was empty"
+                then return read rowReader
+                else return! raise <| NoResultsException "Expected at least one row to be returned from the result set. Instead it was empty"
             finally
                 match props.ExecutionTarget with
                 | ConnectionString _ -> connection.Dispose()
                 | _ -> ()
-        with error ->
-            Error error
-
-    let executeAsync (read: RowReader -> 't) (props: SqlProps) : Async<Result<'t list, exn>> =
-        async {
-            try
-                let! token =  Async.CancellationToken
-                use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
-                let mergedToken = mergedTokenSource.Token
-                if List.isEmpty props.SqlQuery
-                then raise <| MissingQueryException "No query provided to execute. Please use Sql.query"
-                let connection = createConnection props
-                try
-                    if not (connection.State.HasFlag ConnectionState.Open)
-                    then do! Async.AwaitTask(connection.OpenAsync(mergedToken))
-                    use command = makeCommand props connection
-                    do populateCmd command props
-                    if props.NeedPrepare then command.Prepare()
-                    use! reader = Async.AwaitTask (command.ExecuteReaderAsync(mergedToken))
-                    let postgresReader = unbox<NpgsqlDataReader> reader
-                    let rowReader = RowReader(postgresReader)
-                    let result = ResizeArray<'t>()
-                    while reader.Read() do result.Add (read rowReader)
-                    return Ok (List.ofSeq result)
-                finally
-                    match props.ExecutionTarget with
-                    | ConnectionString _ -> connection.Dispose()
-                    | _ -> ()
-            with error ->
-                return Error error
-        }
-
-    let iterAsync (perform: RowReader -> unit) (props: SqlProps) : Async<Result<unit, exn>> =
-        async {
-            try
-                let! token =  Async.CancellationToken
-                use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
-                let mergedToken = mergedTokenSource.Token
-                if List.isEmpty props.SqlQuery
-                then raise <| MissingQueryException "No query provided to execute. Please use Sql.query"
-                let connection = createConnection props
-                try
-                    if not (connection.State.HasFlag ConnectionState.Open)
-                    then do! Async.AwaitTask(connection.OpenAsync(mergedToken))
-                    use command = makeCommand props connection
-                    do populateCmd command props
-                    if props.NeedPrepare then command.Prepare()
-                    use! reader = Async.AwaitTask (command.ExecuteReaderAsync(mergedToken))
-                    let postgresReader = unbox<NpgsqlDataReader> reader
-                    let rowReader = RowReader(postgresReader)
-                    while reader.Read() do perform rowReader
-                    return Ok ()
-                finally
-                    match props.ExecutionTarget with
-                    | ConnectionString _ -> connection.Dispose()
-                    | _ -> ()
-            with error ->
-                return Error error
-        }
-
-    let executeRowAsync (read: RowReader -> 't) (props: SqlProps) : Async<Result<'t, exn>> =
-        async {
-            try
-                let! token =  Async.CancellationToken
-                use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
-                let mergedToken = mergedTokenSource.Token
-                if List.isEmpty props.SqlQuery
-                then raise <| MissingQueryException "No query provided to execute. Please use Sql.query"
-                let connection = createConnection props
-                try
-                    if not (connection.State.HasFlag ConnectionState.Open)
-                    then do! Async.AwaitTask(connection.OpenAsync(mergedToken))
-                    use command = makeCommand props connection
-                    do populateCmd command props
-                    if props.NeedPrepare then command.Prepare()
-                    use! reader = Async.AwaitTask (command.ExecuteReaderAsync(mergedToken))
-                    let postgresReader = unbox<NpgsqlDataReader> reader
-                    let rowReader = RowReader(postgresReader)
-                    if reader.Read()
-                    then return Ok (read rowReader)
-                    else return! raise <| NoResultsException "Expected at least one row to be returned from the result set. Instead it was empty"
-                finally
-                    match props.ExecutionTarget with
-                    | ConnectionString _ -> connection.Dispose()
-                    | _ -> ()
-            with error ->
-                return Error error
         }
 
     /// Executes the query and returns the number of rows affected
-    let executeNonQuery (props: SqlProps) : Result<int, exn> =
+    let executeNonQuery (props: SqlProps) : int =
+        if List.isEmpty props.SqlQuery
+        then raise <| MissingQueryException "No query provided to execute..."
+        let connection = createConnection props
         try
+            if not (connection.State.HasFlag ConnectionState.Open)
+            then connection.Open()
+            use command = makeCommand props connection
+            populateCmd command props
+            if props.NeedPrepare then command.Prepare()
+            command.ExecuteNonQuery()
+        finally
+            match props.ExecutionTarget with
+            | ConnectionString _ -> connection.Dispose()
+            | _ -> ()
+
+    /// Executes the query as asynchronously and returns the number of rows affected
+    let executeNonQueryAsync  (props: SqlProps) =
+        task {
             if List.isEmpty props.SqlQuery
-            then raise <| MissingQueryException "No query provided to execute..."
+            then raise <| MissingQueryException "No query provided to execute. Please use Sql.query"
             let connection = createConnection props
             try
                 if not (connection.State.HasFlag ConnectionState.Open)
-                then connection.Open()
+                then do! connection.OpenAsync props.CancellationToken
                 use command = makeCommand props connection
                 populateCmd command props
                 if props.NeedPrepare then command.Prepare()
-                Ok (command.ExecuteNonQuery())
+                let! affectedRows = command.ExecuteNonQueryAsync props.CancellationToken
+                return affectedRows
             finally
                 match props.ExecutionTarget with
                 | ConnectionString _ -> connection.Dispose()
                 | _ -> ()
-        with
-            | error -> Error error
-
-    /// Executes the query as asynchronously and returns the number of rows affected
-    let executeNonQueryAsync (props: SqlProps) =
-        async {
-            try
-                let! token = Async.CancellationToken
-                use mergedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token, props.CancellationToken)
-                let mergedToken = mergedTokenSource.Token
-                if List.isEmpty props.SqlQuery
-                then raise <| MissingQueryException "No query provided to execute. Please use Sql.query"
-                let connection = createConnection props
-                try
-                    if not (connection.State.HasFlag ConnectionState.Open)
-                    then do! Async.AwaitTask (connection.OpenAsync(mergedToken))
-                    use command = makeCommand props connection
-                    populateCmd command props
-                    if props.NeedPrepare then command.Prepare()
-                    let! affectedRows = Async.AwaitTask(command.ExecuteNonQueryAsync(mergedToken))
-                    return Ok affectedRows
-                finally
-                    match props.ExecutionTarget with
-                    | ConnectionString _ -> connection.Dispose()
-                    | _ -> ()
-            with
-            | error -> return Error error
         }

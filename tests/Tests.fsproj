@@ -8,8 +8,7 @@
     <ProjectReference Include="../src/Npgsql.FSharp.fsproj" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="NpgsqlFSharpTessts.fs" />
-    <Compile Include="NpgsqlFSharpTasksTests.fs" />
+    <Compile Include="NpgsqlFSharpTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
   <Import Project="..\.paket\Paket.Restore.targets" />

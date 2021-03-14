@@ -14,6 +14,7 @@
       new Docute({
         layout: "wide",
         target: '#root',
+        highlight: [ "fsharp", "bash", "ocaml", "fs", "json", "sass", "sql" ],
         cssVariables: {
           accentColor:  "hsl(171, 100%, 41%)",
           sidebarWidth: "300px",
@@ -31,13 +32,24 @@
                 links: [
                     { title: "Introduction", link: "/" },
                     { title: "Install From Nuget", link: "/install" },
-                    { title: "LICENSE (MIT)", link: "/license" }
+                    { title: "LICENSE (MIT)", link: "/license" },
+                    { title: "Migrating from v3 to v4", link: "/migrate-v3-to-v4" }
                 ]
             },
             {
               title: "Use cases",
               links: [
-                { title: "Simple Quey", link: "/usecases/simple-query" }
+                { title: "Acquire connection string", link: "/usecases/connection-string" },
+                { title: "Querying a table", link: "/usecases/simple-query" },
+                { title: "Dealing with nullable columns", link: "/usecases/dealing-with-null" },
+                { title: "Queries with parameters", link: "/usecases/parameters" },
+                { title: "Inserting a row into a table", link: "/usecases/insert-row" },
+                { title: "Returning inserted rows", link: "/usecases/return-from-insert" },
+                { title: "Counting rows", link: "/usecases/counting-rows" },
+                { title: "Batch operations", link: "/usecases/batch-updates-or-inserts" },
+                { title: "Iterating over the result set", link: "/usecases/iterating-over-resultset" },
+                { title: "Use an existing connection", link: "/usecases/existing-connection" },
+                { title: "Add use case ➕", link: "/usecases/add-use-case" }
               ]
             }
         ]
