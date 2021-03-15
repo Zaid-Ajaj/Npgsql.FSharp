@@ -4,7 +4,7 @@ Thin F#-friendly layer for the [Npgsql](https://github.com/npgsql/npgsql) data p
 
 For an optimal developer experience, this library is made to work with [Npgsql.FSharp.Analyzer](https://github.com/Zaid-Ajaj/Npgsql.FSharp.Analyzer) which is a F# analyzer that will verify the query syntax and perform type-checking against the parameters and the types of the columns from the result set.
 
-Read the full documentation at [zaid-ajaj.github.io/npgsql.fsharp](zaid-ajaj.github.io/npgsql.fsharp)
+Read the full documentation at [zaid-ajaj.github.io/Npgsql.FSharp](https://zaid-ajaj.github.io/Npgsql.FSharp)
 
 ### Install from nuget
 ```bash
