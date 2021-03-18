@@ -12,7 +12,7 @@ create table users (
 );
 ```
 The columns `first_name` and `last_name` are nullable columns of type `text`. To read those column values, we use the reader functions that end with `orNone` as follows:
-```fsharp {highlight: [20, 21]}
+```fsharp {highlight: [7, 8, 20, 21]}
 open Npgsql.FSharp
 
 type User = {
