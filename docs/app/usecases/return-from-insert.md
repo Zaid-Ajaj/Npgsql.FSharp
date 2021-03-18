@@ -30,3 +30,4 @@ let addUser (connectionString:string, username:string, email:string) : User =
 ```
 Besides ending the query with `RETURNING *` we also use the `Sql.executeRow` function which reads a single row from the returned result set. This works perfectly in case of an insert because we know a succesfull query will return one row with the data of the added user.
 
+> Keep in mind that when using `Sql.executeRow` there should at least be one row! Otherwise the function will throw an exception. If your result set is expecting zero or more rows then using `Sql.execute (...) |> List.tryHead` is a better option for you.
