@@ -1,4 +1,4 @@
-### Querying a table
+# Querying a table
 
 Given the following database table:
 ```sql
