@@ -23,7 +23,7 @@ Using this from F# as follows:
 ```fsharp
 open Npgsql.FSharp
 
-let [<Litral>] usernameOrEmailExistQuery = """
+let [<Literal>] usernameOrEmailExistQuery = """
 SELECT EXISTS (
     SELECT 1
     FROM users
@@ -49,6 +49,6 @@ let usernameOrEmailAlreadyExist (connectionString, username, email) : bool =
     |> Sql.parameters [ "@username", Sql.text username; "@email", Sql.text email ]
     |> Sql.executeRow (fun read -> read.int64 "matches" > 0L)
 ```
-The former query using `SELECT EXISTS` is probably faster than `SELECT COUNT(*)` depending on your table indeces but the idea is the same.
+The former query using `SELECT EXISTS` is probably faster than `SELECT COUNT(*)` depending on your table indices but the idea is the same.
 
 > Keep in mind that when using `Sql.executeRow` there should at least be one row! Otherwise the function will throw an exception. If your result set is expecting zero or more rows then using `Sql.execute (...) |> List.tryHead` is a better option for you.
