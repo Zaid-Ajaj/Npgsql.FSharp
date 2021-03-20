@@ -251,7 +251,7 @@ Sometimes it isn't enough to simply use `Sql.executeTransaction` / `Sql.executeT
 
 You can do this by creating your own `NpgsqlTransaction` and using it to execute the SQL commands as follows:
 ```fs
-open Ngpsql
+open Npgsql
 open Npgsql.FSharp.Tasks // or Npgsql.FSharp
 
 let connectionString = " . . . "
