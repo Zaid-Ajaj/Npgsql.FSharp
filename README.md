@@ -367,6 +367,5 @@ let jsonFromDatabase =
     connectionString
     |> Sql.connect
     |> Sql.query "SELECT * FROM json_blobs"
-    |> Sql.skipAnalysis
     |> Sql.execute (fun read -> read.fieldValue<JsonBlob> "json_blob")
 ```
