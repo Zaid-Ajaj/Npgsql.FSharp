@@ -2,8 +2,7 @@
   <PropertyGroup>
     <Description>Thin functional F# layer around Npgsql, the PostgreSQL database driver.</Description>
     <PackageProjectUrl>https://github.com/Zaid-Ajaj/Npgsql.FSharp</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/Zaid-Ajaj/Npgsql.FSharp.git</RepositoryUrl>
-    <PackageLicenseUrl>https://github.com/Zaid-Ajaj/Npgsql.FSharp/blob/master/LICENSE</PackageLicenseUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageIconUrl></PackageIconUrl>
     <PackageTags>fsharp;postgres;sql;ngpsql</PackageTags>
     <Authors>Zaid Ajaj</Authors>
@@ -12,11 +11,13 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <LangVersion>latest</LangVersion>
     <PackageReleaseNotes>Major release v4</PackageReleaseNotes>
+    <PackageReadmeFile>/README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Common.fs" />
     <Compile Include="PostgresUri.fs" />
     <Compile Include="Npgsql.FSharp.fs" />
+    <Content Include="../README.md" PackagePath="/" />
   </ItemGroup>
 
   <Import Project="..\.paket\Paket.Restore.targets" />

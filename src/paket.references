@@ -1,3 +1,4 @@
 FSharp.Core
 Npgsql
 Ply
+DotNet.ReproducibleBuilds
