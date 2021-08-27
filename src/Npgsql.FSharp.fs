@@ -169,6 +169,22 @@ module Sql =
     /// Configures the SQL query to execute
     let query (sql: string) props = { props with SqlQuery = [sql] }
     let func (sql: string) props = { props with SqlQuery = [sql]; IsFunction = true }
+
+    let queryI (sql: FormattableString) props =
+        let mutable parameterizedString = sql.Format
+        for i = 0 to sql.ArgumentCount-1 do
+            parameterizedString <- parameterizedString.Replace($"{{{i}}}", $"@p{i}")
+        printfn $"%s{parameterizedString}"
+        let parameters =
+            List.init (sql.ArgumentCount) (fun i ->
+                let name = $"p{i}"
+                let p = NpgsqlParameter(name, sql.GetArgument(i))
+                printfn $"%s{name}, %A{p.Value}"
+                name, SqlValue.Parameter p)
+        { props with
+            SqlQuery = [parameterizedString]
+            Parameters = parameters }
+
     let prepare  props = { props with NeedPrepare = true }
     /// Provides the SQL parameters for the query
     let parameters ls props = { props with Parameters = ls }
@@ -206,6 +222,10 @@ module Sql =
 
             let add value valueType =
                 cmd.Parameters.AddWithValue(normalizedParameterName, valueType, value)
+                |> ignore
+
+            let addUntyped value =
+                cmd.Parameters.AddWithValue(normalizedParameterName, value)
                 |> ignore
 
             match value with

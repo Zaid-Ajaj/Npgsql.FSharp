@@ -1257,6 +1257,39 @@ let tests =
 
         ] |> testSequenced
 
+        test "interpolated string parsing" {
+            let names = [ 'a'..'z' ]
+            let seedDatabase (connection: string) =
+                connection
+                |> Sql.connect
+                |> Sql.executeTransaction [
+                    "INSERT INTO fsharp_test (test_id, test_name) values (@test_id, @name)", (
+                        names
+                        |> List.mapi (fun i name ->
+                            ["test_id", Sql.int i; "name", Sql.string (string name) ]
+                        )
+                    )
+                    ]
+                |> ignore
+            use db = buildDatabase()
+            seedDatabase db.ConnectionString
+
+            let id = 12
+            let limit = 5
+            let offset = 5
+            let names =
+                Sql.connect db.ConnectionString
+                |> Sql.queryI $"select test_name from fsharp_test where test_id > {id} limit {limit} offset {offset}"
+                |> Sql.execute (fun r ->
+                    r.string "test_name"
+                )
+
+
+            let expected = ['s'..'w' ] |> List.map string
+
+            Expect.sequenceEqual names expected "should have adhered to id, limit, and offset parameters"
+
+        }
     ]
 
 let unknownColumnTest =
