@@ -174,12 +174,10 @@ module Sql =
         let mutable parameterizedString = sql.Format
         for i = 0 to sql.ArgumentCount-1 do
             parameterizedString <- parameterizedString.Replace($"{{{i}}}", $"@p{i}")
-        printfn $"%s{parameterizedString}"
         let parameters =
             List.init (sql.ArgumentCount) (fun i ->
                 let name = $"p{i}"
                 let p = NpgsqlParameter(name, sql.GetArgument(i))
-                printfn $"%s{name}, %A{p.Value}"
                 name, SqlValue.Parameter p)
         { props with
             SqlQuery = [parameterizedString]
