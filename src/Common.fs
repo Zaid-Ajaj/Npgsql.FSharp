@@ -19,6 +19,7 @@ type SqlValue =
     | Bit of bool
     | Bool of bool
     | Number of double
+    | Real of float32
     | Money of decimal
     | Decimal of decimal
     | Bytea of byte[]
@@ -75,6 +76,9 @@ type Sql() =
     static member double(value: double) = SqlValue.Number value
     static member doubleOrNone(value: double option) = Utils.sqlMap value Sql.double
     static member doubleOrValueNone(value: double voption) = Utils.sqlValueMap value Sql.double
+    static member real(value: float32) = SqlValue.Real value
+    static member realOrNone(value: float32 option) = Utils.sqlMap value Sql.real
+    static member realOrValueNone(value: float32 voption) = Utils.sqlValueMap value Sql.real
     static member decimal(value: decimal) = SqlValue.Decimal value
     static member decimalOrNone(value: decimal option) = Utils.sqlMap value Sql.decimal
     static member decimalOrValueNone(value: decimal voption) = Utils.sqlValueMap value Sql.decimal
@@ -449,6 +453,27 @@ type RowReader(reader: NpgsqlDataReader) =
             then ValueNone
             else ValueSome (reader.GetDouble(columnIndex))
         | false, _ -> failToRead column "double"
+        
+    member this.real(column: string) : float32 =
+        match columnDict.TryGetValue(column) with
+        | true, columnIndex -> reader.GetFloat(columnIndex)
+        | false, _ -> failToRead column "real"
+
+    member this.realOrNone(column: string) : float32 option =
+        match columnDict.TryGetValue(column) with
+        | true, columnIndex ->
+            if reader.IsDBNull(columnIndex)
+            then None
+            else Some (reader.GetFloat(columnIndex))
+        | false, _ -> failToRead column "real"
+
+    member this.realOrValueNone(column: string) : float32 voption =
+        match columnDict.TryGetValue(column) with
+        | true, columnIndex ->
+            if reader.IsDBNull(columnIndex)
+            then ValueNone
+            else ValueSome (reader.GetFloat(columnIndex))
+        | false, _ -> failToRead column "real"
 
     member this.NpgsqlReader = reader
 

@@ -219,6 +219,7 @@ module Sql =
             | SqlValue.Timestamp timestamp -> add timestamp NpgsqlDbType.Timestamp
             | SqlValue.TimestampWithTimeZone timestampTz -> add timestampTz NpgsqlDbType.TimestampTz
             | SqlValue.Number number -> add number NpgsqlDbType.Double
+            | SqlValue.Real real -> add real NpgsqlDbType.Real
             | SqlValue.Bool boolean -> add boolean NpgsqlDbType.Boolean
             | SqlValue.Decimal number -> add number NpgsqlDbType.Numeric
             | SqlValue.Money number -> add number NpgsqlDbType.Money
