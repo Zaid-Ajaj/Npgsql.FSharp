@@ -1227,6 +1227,23 @@ let tests =
                 let value = Sql.doubleOrValueNone ValueNone
                 Expect.equal SqlValue.Null value "Unexpected value Sql.doubleOrValueNone (ValueNone)"
 
+                // real
+                let data = 14.f
+                let value = Sql.real data
+                Expect.equal (SqlValue.Real data) value "Unexpected value Sql.real"
+
+                let value = Sql.realOrNone (Some data)
+                Expect.equal (SqlValue.Real data) value "Unexpected value Sql.realOrNone (Some)"
+
+                let value = Sql.realOrNone None
+                Expect.equal SqlValue.Null value "Unexpected value Sql.realOrNone (None)"
+
+                let value = Sql.realOrValueNone (ValueSome data)
+                Expect.equal (SqlValue.Real data) value "Unexpected value Sql.realOrValueNone (ValueSome)"
+
+                let value = Sql.realOrValueNone ValueNone
+                Expect.equal SqlValue.Null value "Unexpected value Sql.realOrValueNone (ValueNone)"
+
                 //decimal
                 let data = 9M
                 let value = Sql.decimal data

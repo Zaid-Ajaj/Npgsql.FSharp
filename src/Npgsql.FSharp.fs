@@ -233,6 +233,7 @@ module Sql =
             | SqlValue.IntArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Integer)
             | SqlValue.ShortArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Smallint)
             | SqlValue.LongArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Bigint)
+            | SqlValue.Real x -> add x NpgsqlDbType.Real
             | SqlValue.Parameter x ->
                 x.ParameterName <- normalizedParameterName
                 ignore (cmd.Parameters.Add(x))

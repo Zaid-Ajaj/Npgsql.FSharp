@@ -20,6 +20,7 @@ type SqlValue =
     | Bool of bool
     | Number of double
     | Money of decimal
+    | Real of float32
     | Decimal of decimal
     | Bytea of byte[]
     | Uuid of Guid
@@ -74,6 +75,9 @@ type Sql() =
     static member money(value: decimal) = SqlValue.Money value
     static member moneyOrNone(value: decimal option) = Utils.sqlMap value Sql.money
     static member moneyOrValueNone(value: decimal voption) = Utils.sqlValueMap value Sql.money
+    static member real(value: float32) = SqlValue.Real value
+    static member realOrNone(value: float32 option) = Utils.sqlMap value Sql.real
+    static member realOrValueNone(value: float32 voption) = Utils.sqlValueMap value Sql.real
     static member int8(value: int8) = SqlValue.TinyInt value
     static member int8OrNone(value: int8 option) = Utils.sqlMap value Sql.int8
     static member int8OrValueNone(value: int8 voption) = Utils.sqlValueMap value Sql.int8
@@ -169,8 +173,9 @@ type RowReader(reader: NpgsqlDataReader) =
     member this.fieldValue<'a>(column: string) : 'a =
         match columnDict.TryGetValue(column) with
         | true, columnIndex -> reader.GetFieldValue<'a>(columnIndex)
-        | false, _ -> let typeName = typeof<'a>.ToString()
-                      failToRead column typeName
+        | false, _ ->
+            let typeName = typeof<'a>.ToString()
+            failToRead column typeName
 
     member this.fieldValueOrNone<'a>(column: string) : 'a option =
         match columnDict.TryGetValue(column) with
@@ -178,8 +183,9 @@ type RowReader(reader: NpgsqlDataReader) =
             if reader.IsDBNull(columnIndex)
             then None
             else Some (reader.GetFieldValue<'a>(columnIndex))
-        | false, _ -> let typeName = typeof<'a>.ToString()
-                      failToRead column typeName
+        | false, _ ->
+            let typeName = typeof<'a>.ToString()
+            failToRead column typeName
 
     member this.fieldValueOrValueNone<'a>(column: string) : 'a voption =
         match columnDict.TryGetValue(column) with
@@ -187,8 +193,9 @@ type RowReader(reader: NpgsqlDataReader) =
             if reader.IsDBNull(columnIndex)
             then ValueNone
             else ValueSome (reader.GetFieldValue<'a>(columnIndex))
-        | false, _ -> let typeName = typeof<'a>.ToString()
-                      failToRead column typeName
+        | false, _ ->
+            let typeName = typeof<'a>.ToString()
+            failToRead column typeName
 
     member this.int(column: string) : int =
         this.fieldValue(column)
@@ -198,6 +205,27 @@ type RowReader(reader: NpgsqlDataReader) =
 
     member this.intOrValueNone(column: string) : int voption =
         this.fieldValueOrValueNone(column)
+
+    member this.real(column: string) : float32 =
+        match columnDict.TryGetValue(column) with
+        | true, columnIndex -> reader.GetFloat(columnIndex)
+        | false, _ -> failToRead column "real"
+
+    member this.realOrNone(column: string) : float32 option =
+        match columnDict.TryGetValue(column) with
+        | true, columnIndex ->
+            if reader.IsDBNull(columnIndex)
+            then None
+            else Some (reader.GetFloat(columnIndex))
+        | false, _ -> failToRead column "real"
+
+    member this.realOrValueNone(column: string) : float32 voption =
+        match columnDict.TryGetValue(column) with
+        | true, columnIndex ->
+            if reader.IsDBNull(columnIndex)
+            then ValueNone
+            else ValueSome (reader.GetFloat(columnIndex))
+        | false, _ -> failToRead column "real"
 
     /// Gets the value of the specified column as a 16-bit signed integer.
     ///
