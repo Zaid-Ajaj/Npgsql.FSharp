@@ -42,13 +42,6 @@ module internal Utils =
     let sqlValueMap (option: 'a voption) (f: 'a -> SqlValue) : SqlValue =
         ValueOption.defaultValue SqlValue.Null (ValueOption.map f option)
 
-module Async =
-    let map f comp =
-        async {
-            let! result = comp
-            return f result
-        }
-
 exception MissingQueryException of string
 exception NoResultsException of string
 exception UnknownColumnException of string
@@ -171,113 +164,79 @@ type RowReader(reader: NpgsqlDataReader) =
                     availableColumns)
     with
 
-    member this.int(column: string) : int =
+    /// Get the column value as the type specified in the type parameter.
+    /// Can be used when the package is used in conjuction with the Json.NET type plugin for npgsql.
+    member this.fieldValue<'a>(column: string) : 'a =
         match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetInt32(columnIndex)
-        | false, _ -> failToRead column "int"
+        | true, columnIndex -> reader.GetFieldValue<'a>(columnIndex)
+        | false, _ -> let typeName = typeof<'a>.ToString()
+                      failToRead column typeName
 
-    member this.intOrNone(column: string) : int option =
+    member this.fieldValueOrNone<'a>(column: string) : 'a option =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
             if reader.IsDBNull(columnIndex)
             then None
-            else Some (reader.GetInt32(columnIndex))
-        | false, _ -> failToRead column "int"
+            else Some (reader.GetFieldValue<'a>(columnIndex))
+        | false, _ -> let typeName = typeof<'a>.ToString()
+                      failToRead column typeName
 
-    member this.intOrValueNone(column: string) : int voption =
+    member this.fieldValueOrValueNone<'a>(column: string) : 'a voption =
         match columnDict.TryGetValue(column) with
         | true, columnIndex ->
             if reader.IsDBNull(columnIndex)
             then ValueNone
-            else ValueSome (reader.GetInt32(columnIndex))
-        | false, _ -> failToRead column "int"
+            else ValueSome (reader.GetFieldValue<'a>(columnIndex))
+        | false, _ -> let typeName = typeof<'a>.ToString()
+                      failToRead column typeName
+
+    member this.int(column: string) : int =
+        this.fieldValue(column)
+
+    member this.intOrNone(column: string) : int option =
+        this.fieldValueOrNone(column)
+
+    member this.intOrValueNone(column: string) : int voption =
+        this.fieldValueOrValueNone(column)
 
     /// Gets the value of the specified column as a 16-bit signed integer.
     ///
     /// Can be used to read columns of type `smallint` or `int16`
     member this.int16(column: string) : int16 =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetInt16(columnIndex)
-        | false, _ -> failToRead column "int16"
+        this.fieldValue(column)
 
     member this.int16OrNone(column: string) : int16 option =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then None
-            else Some (reader.GetInt16(columnIndex))
-        | false, _ -> failToRead column "int16"
+        this.fieldValueOrNone(column)
 
     member this.int16OrValueNone(column: string) : int16 voption =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then ValueNone
-            else ValueSome (reader.GetInt16(columnIndex))
-        | false, _ -> failToRead column "int16"
+        this.fieldValueOrValueNone(column)
 
     member this.intArray(column: string) : int[] =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetFieldValue<int[]>(columnIndex)
-        | false, _ -> failToRead column "int[]"
+        this.fieldValue(column)
 
     member this.intArrayOrNone(column: string) : int[] option =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then None
-            else Some (reader.GetFieldValue<int[]>(columnIndex))
-        | false, _ -> failToRead column "int[]"
+        this.fieldValueOrNone(column)
 
     member this.intArrayOrValueNone(column: string) : int[] voption =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then ValueNone
-            else ValueSome (reader.GetFieldValue<int[]>(columnIndex))
-        | false, _ -> failToRead column "int[]"
+        this.fieldValueOrValueNone(column);
 
     member this.int16Array(column: string) : int16[] =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetFieldValue<int16[]>(columnIndex)
-        | false, _ -> failToRead column "int16[]"
+        this.fieldValue(column)
 
     member this.int16ArrayOrNone(column: string) : int16[] option =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then None
-            else Some (reader.GetFieldValue<int16[]>(columnIndex))
-        | false, _ -> failToRead column "int16[]"
+        this.fieldValueOrNone(column)
 
     member this.int16ArrayOrValueNone(column: string) : int16[] voption =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then ValueNone
-            else ValueSome (reader.GetFieldValue<int16[]>(columnIndex))
-        | false, _ -> failToRead column "int16[]"
+        this.fieldValueOrValueNone(column)
 
     member this.int64Array(column: string) : int64[] =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetFieldValue<int64[]>(columnIndex)
-        | false, _ -> failToRead column "int64[]"
+        this.fieldValue(column)
 
     member this.int64ArrayOrNone(column: string) : int64[] option =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then None
-            else Some (reader.GetFieldValue<int64[]>(columnIndex))
-        | false, _ -> failToRead column "int64[]"
+        this.fieldValueOrNone(column)
 
     member this.int64ArrayOrValueNone(column: string) : int64[] voption =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then ValueNone
-            else ValueSome (reader.GetFieldValue<int64[]>(columnIndex))
-        | false, _ -> failToRead column "int64[]"
+        this.fieldValueOrValueNone(column)
 
     /// Reads the given column of type timestamptz as DateTimeOffset.
     /// PostgreSQL stores the values of timestamptz as UTC in the database.
@@ -285,9 +244,7 @@ type RowReader(reader: NpgsqlDataReader) =
     /// See https://www.npgsql.org/doc/types/datetime.html#detailed-behavior-reading-values-from-the-database
     /// This function however, converts it back to UTC the same way it was stored.
     member this.datetimeOffset(column: string) : DateTimeOffset =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetFieldValue<DateTimeOffset>(columnIndex).ToUniversalTime()
-        | false, _ -> failToRead column "DateTimeOffset"
+        this.fieldValue<DateTimeOffset>(column).ToUniversalTime()
 
     /// Reads the given column of type timestamptz as DateTimeOffset.
     /// PostgreSQL stores the values of timestamptz as UTC in the database.
@@ -295,13 +252,8 @@ type RowReader(reader: NpgsqlDataReader) =
     /// See https://www.npgsql.org/doc/types/datetime.html#detailed-behavior-reading-values-from-the-database
     /// This function however, converts it back to UTC the same way it was stored.
     member this.datetimeOffsetOrNone(column: string) : DateTimeOffset option =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then None
-            else Some (reader.GetFieldValue<DateTimeOffset>(columnIndex).ToUniversalTime())
-        | false, _ ->
-            failToRead column "DateTimeOffset"
+        this.fieldValueOrNone<DateTimeOffset>(column)
+        |> Option.map (fun dt -> dt.ToUniversalTime())
 
     /// Reads the given column of type timestamptz as DateTimeOffset.
     /// PostgreSQL stores the values of timestamptz as UTC in the database.
@@ -309,76 +261,35 @@ type RowReader(reader: NpgsqlDataReader) =
     /// See https://www.npgsql.org/doc/types/datetime.html#detailed-behavior-reading-values-from-the-database
     /// This function however, converts it back to UTC the same way it was stored.
     member this.datetimeOffsetOrValueNone(column: string) : DateTimeOffset voption =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then ValueNone
-            else ValueSome (reader.GetFieldValue<DateTimeOffset>(columnIndex).ToUniversalTime())
-        | false, _ ->
-            failToRead column "DateTimeOffset"
+        this.fieldValueOrValueNone<DateTimeOffset>(column)
+        |> ValueOption.map (fun dt -> dt.ToUniversalTime())
 
     member this.stringArray(column: string) : string[] =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetFieldValue<string[]>(columnIndex)
-        | false, _ -> failToRead column "string[]"
+      this.fieldValue(column)
 
     member this.stringArrayOrNone(column: string) : string[] option =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then None
-            else Some (reader.GetFieldValue<string[]>(columnIndex))
-        | false, _ -> failToRead column "string[]"
+      this.fieldValueOrNone(column)
 
     member this.stringArrayOrValueNone(column: string) : string[] voption =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then ValueNone
-            else ValueSome (reader.GetFieldValue<string[]>(columnIndex))
-        | false, _ -> failToRead column "string[]"
+        this.fieldValueOrValueNone(column)
 
     member this.int64(column: string) : int64 =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetInt64(columnIndex)
-        | false, _ -> failToRead column "int64"
+        this.fieldValue(column)
 
     member this.int64OrNone(column: string) : int64 option =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then None
-            else Some (reader.GetInt64(columnIndex))
-        | false, _ -> failToRead column "int64"
+        this.fieldValueOrNone(column)
 
     member this.int64OrValueNone(column: string) : int64 voption =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then ValueNone
-            else ValueSome (reader.GetInt64(columnIndex))
-        | false, _ -> failToRead column "int64"
+        this.fieldValueOrValueNone(column)
 
     member this.string(column: string) : string =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetString(columnIndex)
-        | false, _ -> failToRead column "string"
+        this.fieldValue(column)
 
     member this.stringOrNone(column: string) : string option =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then None
-            else Some (reader.GetString(columnIndex))
-        | false, _ -> failToRead column "string"
+        this.fieldValueOrNone(column)
 
     member this.stringOrValueNone(column: string) : string voption =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then ValueNone
-            else ValueSome (reader.GetString(columnIndex))
-        | false, _ -> failToRead column "string"
+        this.fieldValueOrValueNone(column)
 
     /// <summary>Alias for reading string</summary>
     member this.text(column: string) : string = this.string column
@@ -388,202 +299,94 @@ type RowReader(reader: NpgsqlDataReader) =
     member this.textOrValueNone(column: string) : string voption = this.stringOrValueNone column
     /// <summary>Reads a column as a boolean value</summary>
     member this.bool(column: string) : bool =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetBoolean(columnIndex)
-        | false, _ -> failToRead column "bool"
+        this.fieldValue(column)
     /// <summary>Reads a column as a boolean value or returns None when the column value is null</summary>
     member this.boolOrNone(column: string) : bool option =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then None
-            else Some (reader.GetFieldValue<bool>(columnIndex))
-        | false, _ -> failToRead column "bool"
+        this.fieldValueOrNone(column)
     /// <summary>Reads a column as a boolean value or returns ValueNone when the column value is null</summary>
     member this.boolOrValueNone(column: string) : bool voption =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then ValueNone
-            else ValueSome (reader.GetFieldValue<bool>(columnIndex))
-        | false, _ -> failToRead column "bool"
+        this.fieldValueOrValueNone(column)
     /// <summary>Reads the column value as decimal</summary>
     member this.decimal(column: string) : decimal =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetDecimal(columnIndex)
-        | false, _ -> failToRead column "decimal"
+        this.fieldValue(column)
     /// <summary>Reads the column value as decimal or returns None when the column is null</summary>
     member this.decimalOrNone(column: string) : decimal option =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then None
-            else Some (reader.GetDecimal(columnIndex))
-        | false, _ -> failToRead column "decimal"
+        this.fieldValueOrNone(column)
     /// <summary>Reads the column value as decimal or returns ValueNone when the column is null</summary>
     member this.decimalOrValueNone(column: string) : decimal voption =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then ValueNone
-            else ValueSome (reader.GetDecimal(columnIndex))
-        | false, _ -> failToRead column "decimal"
+        this.fieldValueOrValueNone(column)
 
     member this.double(column: string) : double =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetDouble(columnIndex)
-        | false, _ -> failToRead column "double"
+        this.fieldValue(column)
 
     member this.doubleOrNone(column: string) : double option =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then None
-            else Some (reader.GetDouble(columnIndex))
-        | false, _ -> failToRead column "double"
+        this.fieldValueOrNone(column)
 
     member this.doubleOrValueNone(column: string) : double voption =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then ValueNone
-            else ValueSome (reader.GetDouble(columnIndex))
-        | false, _ -> failToRead column "double"
+        this.fieldValueOrValueNone(column)
 
     member this.NpgsqlReader = reader
 
     /// Gets the value of the specified column as a globally-unique identifier (GUID).
     member this.uuid(column: string) : Guid =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetGuid(columnIndex)
-        | false, _ -> failToRead column "guid"
+        this.fieldValue(column)
 
     member this.uuidOrNone(column: string) : Guid option =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then None
-            else Some(reader.GetGuid(columnIndex))
-        | false, _ -> failToRead column "guid"
+        this.fieldValueOrNone(column)
 
     member this.uuidOrValueNone(column: string) : Guid voption =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then ValueNone
-            else ValueSome(reader.GetGuid(columnIndex))
-        | false, _ -> failToRead column "guid"
+        this.fieldValueOrValueNone(column)
 
     /// Gets the value of the specified column as a globally-unique identifier (GUID).
     member this.uuidArray(column: string) : Guid [] =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetFieldValue<Guid []>(columnIndex)
-        | false, _ -> failToRead column "guid[]"
+        this.fieldValue(column)
 
     member this.uuidArrayOrNone(column: string) : Guid [] option =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then None
-            else Some(reader.GetFieldValue<Guid []>(columnIndex))
-        | false, _ -> failToRead column "guid[]"
+        this.fieldValue(column)
 
     member this.uuidArrayOrValueNone(column: string) : Guid [] voption =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then ValueNone
-            else ValueSome(reader.GetFieldValue<Guid []>(columnIndex))
-        | false, _ -> failToRead column "guid[]"
+        this.fieldValueOrValueNone(column)
 
     /// Gets the value of the specified column as a System.DateTime object.
     member this.dateTime(column: string) : DateTime =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetDateTime(columnIndex)
-        | false, _ -> failToRead column "datetime"
+        this.fieldValue(column)
 
     /// Gets the value of the specified column as a System.DateTime object.
     member this.dateTimeOrNone(column: string) : DateTime option =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then None
-            else Some (reader.GetDateTime(columnIndex))
-        | false, _ -> failToRead column "datetime"
+        this.fieldValueOrNone(column)
 
     member this.dateTimeOrValueNone(column: string) : DateTime voption =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then ValueNone
-            else ValueSome (reader.GetDateTime(columnIndex))
-        | false, _ -> failToRead column "datetime"
+        this.fieldValueOrValueNone(column)
 
     /// <summary>Reads the specified column as byte[]</summary>
     member this.bytea(column: string) : byte[] =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetFieldValue<byte[]>(columnIndex)
-        | false, _ -> failToRead column "byte[]"
+        this.fieldValue(column)
 
     /// <summary>Reads the specified column as byte[] or returns None when the column value is null</summary>
     member this.byteaOrNone(column: string) : byte[] option =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then None
-            else Some (reader.GetFieldValue<byte[]>(columnIndex))
-        | false, _ -> failToRead column "byte[]"
+        this.fieldValueOrNone(column)
     /// <summary>Reads the specified column as byte[] or returns ValueNone when the column value is null</summary>
     member this.byteaOrValueNone(column: string) : byte[] voption =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then ValueNone
-            else ValueSome (reader.GetFieldValue<byte[]>(columnIndex))
-        | false, _ -> failToRead column "byte[]"
+        this.fieldValueOrValueNone(column)
 
     /// Gets the value of the specified column as a `System.Single` object.
     member this.float(column: string) : float32 =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetFloat(columnIndex)
-        | false, _ -> failToRead column "float"
+        this.fieldValue(column)
 
     /// Gets the value of the specified column as a `System.Single` object.
     member this.floatOrNone(column: string) : float32 option =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then None
-            else Some (reader.GetFloat(columnIndex))
-        | false, _ -> failToRead column "float"
+        this.fieldValueOrNone(column)
 
     member this.floatOrValueNone(column: string) : float32 voption =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then ValueNone
-            else ValueSome (reader.GetFloat(columnIndex))
-        | false, _ -> failToRead column "float"
+        this.fieldValueOrValueNone(column)
 
     /// Gets the value of the specified column as an `NpgsqlTypes.NpgsqlPoint`
     member this.point(column: string) : NpgsqlPoint =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex -> reader.GetFieldValue<NpgsqlPoint>(columnIndex)
-        | false, _ -> failToRead column "npgsqlpoint"
+        this.fieldValue(column)
 
     /// Gets the value of the specified column as an `NpgsqlTypes.NpgsqlPoint`
     member this.pointOrNone(column: string) : NpgsqlPoint option =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then None
-            else Some (reader.GetFieldValue<NpgsqlPoint>(columnIndex))
-        | false, _ -> failToRead column "npgsqlpoint"
+        this.fieldValueOrNone(column)
 
     member this.pointOrValueNone(column: string) : NpgsqlPoint voption =
-        match columnDict.TryGetValue(column) with
-        | true, columnIndex ->
-            if reader.IsDBNull(columnIndex)
-            then ValueNone
-            else ValueSome (reader.GetFieldValue<NpgsqlPoint>(columnIndex))
-        | false, _ -> failToRead column "npgsqlpoint"
+        this.fieldValueOrValueNone(column)

@@ -43,6 +43,13 @@ type NullablePointTest = {
     nullablepoint: NpgsqlTypes.NpgsqlPoint option
 }
 
+[<CLIMutable>]
+type JsonBlob =
+  {
+    prop1: int
+    prop2: string
+  }
+
 let buildDatabaseConnection handleInfinity : ThrowawayDatabase =
     let createFSharpTable = "create table if not exists fsharp_test (test_id int, test_name text)"
     let createJsonbTable = "create table if not exists data_with_jsonb (data jsonb)"
@@ -1255,6 +1262,34 @@ let tests =
                 Expect.equal SqlValue.Null value "Unexpected value Sql.timestampOrValueNone (ValueNone)"
             }
 
+            test "jsonb support works" {
+                use db = buildDatabase()
+                Sql.connect db.ConnectionString
+                |> Sql.query "CREATE TABLE json_test (id serial primary key, blob jsonb not null)"
+                |> Sql.executeNonQuery
+                |> ignore
+
+                Sql.connect db.ConnectionString
+                |> Sql.executeTransaction [
+                    "INSERT INTO json_test (blob) VALUES (@blob)", [
+                        [ ("@blob", Sql.jsonb """{"prop1": 123, "prop2": "something"}"""); ]
+                    ]
+                ]
+                |> ignore
+
+                let expected = [
+                    {| id = 1; blob = {prop1=123; prop2="something"} |}
+                ]
+
+                Sql.connect db.ConnectionString
+                |> Sql.query "SELECT * FROM json_test"
+                |> Sql.execute (fun read ->
+                    {|
+                        id = read.int "id"
+                        blob = read.fieldValue<JsonBlob> "blob"
+                    |})
+                |> fun blobs -> Expect.equal blobs expected "Json can be read correctly"
+            }
         ] |> testSequenced
 
     ]
