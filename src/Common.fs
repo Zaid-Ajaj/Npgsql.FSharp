@@ -35,6 +35,7 @@ type SqlValue =
     | ShortArray of int16 array
     | LongArray of int64 array
     | Point of NpgsqlPoint
+    | Interval of TimeSpan
 
 module internal Utils =
     let sqlMap (option: 'a option) (f: 'a -> SqlValue) : SqlValue =
@@ -141,7 +142,9 @@ type Sql() =
     static member dbnull = SqlValue.Null
     static member parameter(genericParameter: NpgsqlParameter) = SqlValue.Parameter genericParameter
     static member point(value: NpgsqlPoint) = SqlValue.Point value
-
+    static member interval(value: TimeSpan) = SqlValue.Interval value
+    static member intervalOrNone(value: TimeSpan option) = Utils.sqlMap value Sql.interval
+    static member intervalOrValueNone(value: TimeSpan voption) = Utils.sqlValueMap value Sql.interval
 
 type RowReader(reader: NpgsqlDataReader) =
     let columnDict = Dictionary<string, int>()
@@ -417,4 +420,13 @@ type RowReader(reader: NpgsqlDataReader) =
         this.fieldValueOrNone(column)
 
     member this.pointOrValueNone(column: string) : NpgsqlPoint voption =
+        this.fieldValueOrValueNone(column)
+
+    member this.interval(column: string) : TimeSpan =
+        this.fieldValue(column)
+
+    member this.intervalOrNone(column: string) : TimeSpan option =
+        this.fieldValueOrNone(column)
+
+    member this.intervalOrValueNone(column: string) : TimeSpan voption =
         this.fieldValueOrValueNone(column)
