@@ -25,6 +25,7 @@ type SqlValue =
     | Bytea of byte[]
     | Uuid of Guid
     | UuidArray of Guid []
+    | Interval of TimeSpan
     | Timestamp of DateTime
     | TimestampWithTimeZone of DateTime
     | Time of TimeSpan
@@ -87,6 +88,7 @@ type Sql() =
     static member int64(value: int64) = SqlValue.Long value
     static member int64OrNone(value: int64 option) = Utils.sqlMap value Sql.int64
     static member int64OrValueNone(value: int64 voption) = Utils.sqlValueMap value Sql.int64
+    static member interval(value: TimeSpan) = SqlValue.Interval value
     static member timestamp(value: DateTime) = SqlValue.Timestamp value
     static member timestampOrNone(value: DateTime option) = Utils.sqlMap value Sql.timestamp
     static member timestampOrValueNone(value: DateTime voption) = Utils.sqlValueMap value Sql.timestamp
@@ -266,13 +268,8 @@ type RowReader(reader: NpgsqlDataReader) =
     member this.int64ArrayOrValueNone(column: string) : int64[] voption =
         this.fieldValueOrValueNone(column)
 
-    /// Reads the given column of type timestamptz as DateTimeOffset.
-    /// PostgreSQL stores the values of timestamptz as UTC in the database.
-    /// However, when Npgsql reads those values, they are converted to local offset of the machine running this code.
-    /// See https://www.npgsql.org/doc/types/datetime.html#detailed-behavior-reading-values-from-the-database
-    /// This function however, converts it back to UTC the same way it was stored.
-    member this.datetimeOffset(column: string) : DateTimeOffset =
-        this.fieldValue<DateTimeOffset>(column).ToUniversalTime()
+    member this.interval(column: string) : TimeSpan =
+        this.fieldValue<TimeSpan>(column)
 
     /// Reads the given column of type timestamptz as DateTimeOffset.
     /// PostgreSQL stores the values of timestamptz as UTC in the database.

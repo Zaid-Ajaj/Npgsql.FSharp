@@ -1,5 +1,6 @@
 namespace Npgsql.FSharp
 
+
 open System
 open Npgsql
 open NpgsqlTypes
@@ -8,6 +9,7 @@ open System.Data
 open System.Security.Cryptography.X509Certificates
 open FSharp.Control.Tasks
 open System.Threading.Tasks
+
 
 /// Specifies how to manage SSL.
 [<RequireQualifiedAccess>]
@@ -216,6 +218,7 @@ module Sql =
             | SqlValue.UuidArray uuidArray -> add uuidArray (NpgsqlDbType.Array ||| NpgsqlDbType.Uuid)
             | SqlValue.Short number -> add number NpgsqlDbType.Smallint
             | SqlValue.Date date -> add date NpgsqlDbType.Date
+            | SqlValue.Interval interval -> add interval NpgsqlDbType.Interval
             | SqlValue.Timestamp timestamp -> add timestamp NpgsqlDbType.Timestamp
             | SqlValue.TimestampWithTimeZone timestampTz -> add timestampTz NpgsqlDbType.TimestampTz
             | SqlValue.Number number -> add number NpgsqlDbType.Double
