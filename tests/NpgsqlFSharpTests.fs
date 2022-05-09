@@ -628,6 +628,17 @@ let tests =
                 |> fun output -> Expect.equal id output.[0] "Check uuid read from database is the same sent"
             }
 
+            test "Interval roundtrip" {
+                use db = buildDatabase()
+                let oneHourInterval : TimeSpan = TimeSpan.FromHours 1.0
+                db.ConnectionString
+                |> Sql.connect
+                |> Sql.query "SELECT @interval_input as output"
+                |> Sql.parameters [ "interval_input", Sql.interval oneHourInterval ]
+                |> Sql.execute (fun read -> read.interval "output")
+                |> fun output -> Expect.equal oneHourInterval output.[0] "Check interval read from database is the same sent"
+            }
+
             test "Money roundtrip with @ sign" {
                 use db = buildDatabase()
                 db.ConnectionString

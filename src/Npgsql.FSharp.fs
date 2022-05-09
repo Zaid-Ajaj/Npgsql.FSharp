@@ -238,6 +238,7 @@ module Sql =
                 x.ParameterName <- normalizedParameterName
                 ignore (cmd.Parameters.Add(x))
             | SqlValue.Point x -> add x NpgsqlDbType.Point
+            | SqlValue.Interval x -> add x NpgsqlDbType.Interval
 
     let private populateCmd (cmd: NpgsqlCommand) (props: SqlProps) =
         if props.IsFunction then cmd.CommandType <- CommandType.StoredProcedure
