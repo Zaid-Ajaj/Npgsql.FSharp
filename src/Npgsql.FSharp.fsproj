@@ -7,11 +7,11 @@
     <PackageIconUrl></PackageIconUrl>
     <PackageTags>fsharp;postgres;sql;ngpsql</PackageTags>
     <Authors>Zaid Ajaj</Authors>
-    <Version>4.1.0</Version>
+    <Version>4.2.0</Version>
     <TargetFrameworks>netstandard2.0</TargetFrameworks>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <LangVersion>latest</LangVersion>
-    <PackageReleaseNotes>Expose generic fieldValue function and support 'real' data type</PackageReleaseNotes>
+    <PackageReleaseNotes>interval support</PackageReleaseNotes>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Common.fs" />
