@@ -7,7 +7,7 @@ group Main
 
   nuget FSharp.Core >= 6.0.4
   nuget Ply 0.3.1
-  nuget Npgsql 6.04
+  nuget Npgsql 6.0.4
 
 group Build
   source https://api.nuget.org/v3/index.json
@@ -19,5 +19,6 @@ group Test
   strategy: min
   source https://api.nuget.org/v3/index.json
   nuget FSharp.Core >= 6.0.4
+  nuget Npgsql 6.0.4
   nuget Expecto 9.0.4
   nuget ThrowawayDb.Postgres 1.4.0

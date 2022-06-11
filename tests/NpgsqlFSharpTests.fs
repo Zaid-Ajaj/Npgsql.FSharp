@@ -662,19 +662,6 @@ let tests =
                 |> fun timestamp -> Expect.equal (timestamp.ToUnixTimeSeconds()) (value.ToUnixTimeSeconds()) "The values are the same"
             }
 
-            //test "DateTimeOffset roundtrip when input is local" {
-            //    use db = buildDatabase()
-
-            //    let value = DateTimeOffset.Now
-
-            //    db.ConnectionString
-            //    |> Sql.connect
-            //    |> Sql.query "SELECT @timestamp::timestamptz as value"
-            //    |> Sql.parameters [ "@timestamp", Sql.timestamptz value ]
-            //    |> Sql.executeRow (fun read -> read.datetimeOffset "value")
-            //    |> fun timestamp -> Expect.equal (timestamp.ToUnixTimeSeconds()) (value.ToUnixTimeSeconds()) "The values are the same"
-            //}
-
             test "uuid_generate_v4()" {
                 use db = buildDatabase()
                 db.ConnectionString
