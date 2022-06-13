@@ -78,7 +78,6 @@ let buildDatabaseConnection handleInfinity : ThrowawayDatabase =
         |> Sql.port 5432
         |> Sql.username "postgres"
         |> Sql.password databasePassword
-        //|> Sql.convertInfinityDateTime handleInfinity
         |> Sql.formatConnectionString
 
     let database = ThrowawayDatabase.Create(connection)

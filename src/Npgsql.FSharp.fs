@@ -41,7 +41,6 @@ module Sql =
         Config : string option
         SslMode : SslMode option
         TrustServerCertificate : bool option
-        ConvertInfinityDateTime : bool option
     }
 
     type SqlProps = private {
@@ -63,7 +62,6 @@ module Sql =
         Config = None
         SslMode = None
         TrustServerCertificate = None
-        ConvertInfinityDateTime = None
     }
 
     let private defaultProps() = {
@@ -96,7 +94,6 @@ module Sql =
     /// Specifies the port of the database server. If you don't specify the port, the default port of `5432` is used.
     let port port config = { config with Port = Some port }
     let trustServerCertificate value config = { config with TrustServerCertificate = Some value }
-    let convertInfinityDateTime value config = { config with ConvertInfinityDateTime = Some value }
     let config extraConfig config = { config with Config = Some extraConfig }
     let formatConnectionString (config:ConnectionStringBuilder) =
         [
@@ -107,7 +104,6 @@ module Sql =
             config.Password |> Option.map (sprintf "Password=%s")
             config.SslMode |> Option.map (fun mode -> sprintf "SslMode=%s" (mode.Serialize()))
             config.TrustServerCertificate |> Option.map (sprintf "Trust Server Certificate=%b")
-            config.ConvertInfinityDateTime |> Option.map (sprintf "Convert Infinity DateTime=%b")
             config.Config
         ]
         |> List.choose id
