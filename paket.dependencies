@@ -5,7 +5,7 @@ group Main
   source https://api.nuget.org/v3/index.json
   storage:none
 
-  nuget FSharp.Core >= 6.0.4
+  nuget FSharp.Core >= 4.7.2
   nuget Ply 0.3.1
   nuget Npgsql 6.0.4
 
@@ -18,7 +18,7 @@ group Test
   framework: netstandard2.0,netcoreapp3.1
   strategy: min
   source https://api.nuget.org/v3/index.json
-  nuget FSharp.Core >= 6.0.4
+  nuget FSharp.Core >= 4.7.2
   nuget Npgsql 6.0.4
   nuget Expecto 9.0.4
   nuget ThrowawayDb.Postgres 1.4.0
