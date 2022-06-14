@@ -114,7 +114,7 @@ module Sql =
 
     /// Turns the given postgres Uri into a proper connection string
     let fromUri (uri: Uri) = uri.ToPostgresConnectionString()
-    /// Creates initial database connection configration from a the Uri components.
+    /// Creates initial database connection configuration from a the Uri components.
     /// It try to find `Host`, `Username`, `Password`, `Database` and `Port` from the input `Uri`.
     let fromUriToConfig (uri: Uri) =
         let extractHost (uri: Uri) =
@@ -310,11 +310,13 @@ module Sql =
                         // when the parameter set is empty
                         affectedRowsByQuery.Add 0
                 else
+                    use batch = new NpgsqlBatch(connection, transaction)
                     for parameterSet in parameterSets do
-                        use command = new NpgsqlCommand(query, connection, transaction)
-                        populateRow command parameterSet
-                        let affectedRows = command.ExecuteNonQuery()
-                        affectedRowsByQuery.Add affectedRows
+                        let batchCommand = new NpgsqlBatchCommand(query)
+                        populateBatchRow batchCommand parameterSet
+                        batch.BatchCommands.Add(batchCommand)
+                    let affectedRows = batch.ExecuteNonQuery()
+                    affectedRowsByQuery.Add affectedRows
 
             transaction.Commit()
             List.ofSeq affectedRowsByQuery

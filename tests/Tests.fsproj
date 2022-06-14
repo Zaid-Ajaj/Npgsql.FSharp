@@ -1,8 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
-    <LangVersion>latest</LangVersion>
+    <TargetFramework>net6.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../src/Npgsql.FSharp.fsproj" />
@@ -11,5 +10,8 @@
     <Compile Include="NpgsqlFSharpTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
-  <Import Project="..\.paket\Paket.Restore.targets" />
+  <ItemGroup>
+    <PackageReference Include="Expecto" Version="9.0.4" />
+    <PackageReference Include="ThrowawayDb.Postgres" Version="1.4.0" />
+  </ItemGroup>
 </Project>

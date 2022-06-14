@@ -7,3 +7,4 @@ paket-files
 .ionide
 .vs
 node_modules
+.idea

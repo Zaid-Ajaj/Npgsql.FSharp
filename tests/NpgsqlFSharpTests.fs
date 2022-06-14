@@ -50,7 +50,7 @@ type JsonBlob =
     prop2: string
   }
 
-let buildDatabaseConnection handleInfinity : ThrowawayDatabase =
+let buildDatabase() : ThrowawayDatabase =
     let createFSharpTable = "create table if not exists fsharp_test (test_id int, test_name text)"
     let createJsonbTable = "create table if not exists data_with_jsonb (data jsonb)"
     let createTimestampzTable = "create table if not exists timestampz_test (version integer, date1 timestamptz, date2 timestamptz)"
@@ -99,9 +99,6 @@ let buildDatabaseConnection handleInfinity : ThrowawayDatabase =
     |> ignore
 
     database
-
-let buildDatabase() = buildDatabaseConnection false
-let buildInfinityDatabase() = buildDatabaseConnection true
 
 let tests =
     testList "Integration tests" [

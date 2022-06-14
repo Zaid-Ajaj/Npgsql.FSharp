@@ -1,6 +1,0 @@
-group Test
-
-Expecto
-FSharp.Core
-ThrowawayDb.Postgres
-Npgsql
