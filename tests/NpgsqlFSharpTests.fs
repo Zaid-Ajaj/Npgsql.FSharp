@@ -274,7 +274,7 @@ let tests =
                 |> fun count -> Expect.equal count 0 "Count is zero"
             }
 
-            test "Paramater names can contain trailing spaces" {
+            test "Parameter names can contain trailing spaces" {
                 use db = buildDatabase()
                 use connection = new NpgsqlConnection(db.ConnectionString)
                 connection.Open()
@@ -294,7 +294,7 @@ let tests =
                         ]
                     ]
 
-                Expect.equal result [1; 1; 1] "paramaters can contain trailing spaces"
+                Expect.equal result [3] "parameters can contain trailing spaces"
             }
 
             testAsync "Sql.executeRowAsync works" {
