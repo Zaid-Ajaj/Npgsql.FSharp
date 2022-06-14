@@ -41,7 +41,6 @@ module Sql =
         Config : string option
         SslMode : SslMode option
         TrustServerCertificate : bool option
-        ConvertInfinityDateTime : bool option
     }
 
     type SqlProps = private {
@@ -63,7 +62,6 @@ module Sql =
         Config = None
         SslMode = None
         TrustServerCertificate = None
-        ConvertInfinityDateTime = None
     }
 
     let private defaultProps() = {
@@ -96,7 +94,6 @@ module Sql =
     /// Specifies the port of the database server. If you don't specify the port, the default port of `5432` is used.
     let port port config = { config with Port = Some port }
     let trustServerCertificate value config = { config with TrustServerCertificate = Some value }
-    let convertInfinityDateTime value config = { config with ConvertInfinityDateTime = Some value }
     let config extraConfig config = { config with Config = Some extraConfig }
     let formatConnectionString (config:ConnectionStringBuilder) =
         [
@@ -107,7 +104,6 @@ module Sql =
             config.Password |> Option.map (sprintf "Password=%s")
             config.SslMode |> Option.map (fun mode -> sprintf "SslMode=%s" (mode.Serialize()))
             config.TrustServerCertificate |> Option.map (sprintf "Trust Server Certificate=%b")
-            config.ConvertInfinityDateTime |> Option.map (sprintf "Convert Infinity DateTime=%b")
             config.Config
         ]
         |> List.choose id
@@ -240,6 +236,51 @@ module Sql =
             | SqlValue.Point x -> add x NpgsqlDbType.Point
             | SqlValue.Interval x -> add x NpgsqlDbType.Interval
 
+    let private populateBatchRow (cmd: NpgsqlBatchCommand) (row: (string * SqlValue) list) =
+        for (paramName, value) in row do
+
+            let normalizedParameterName =
+                let paramName = paramName.Trim()
+                if not (paramName.StartsWith "@")
+                then sprintf "@%s" paramName
+                else paramName
+
+            let add value valueType =
+                cmd.Parameters.AddWithValue(normalizedParameterName, valueType, value)
+                |> ignore
+
+            match value with
+            | SqlValue.Bit bit -> add bit NpgsqlDbType.Bit
+            | SqlValue.String text -> add text NpgsqlDbType.Text
+            | SqlValue.Int number -> add number NpgsqlDbType.Integer
+            | SqlValue.Uuid uuid -> add uuid NpgsqlDbType.Uuid
+            | SqlValue.UuidArray uuidArray -> add uuidArray (NpgsqlDbType.Array ||| NpgsqlDbType.Uuid)
+            | SqlValue.Short number -> add number NpgsqlDbType.Smallint
+            | SqlValue.Date date -> add date NpgsqlDbType.Date
+            | SqlValue.Timestamp timestamp -> add timestamp NpgsqlDbType.Timestamp
+            | SqlValue.TimestampWithTimeZone timestampTz -> add timestampTz NpgsqlDbType.TimestampTz
+            | SqlValue.Number number -> add number NpgsqlDbType.Double
+            | SqlValue.Bool boolean -> add boolean NpgsqlDbType.Boolean
+            | SqlValue.Decimal number -> add number NpgsqlDbType.Numeric
+            | SqlValue.Money number -> add number NpgsqlDbType.Money
+            | SqlValue.Long number -> add number NpgsqlDbType.Bigint
+            | SqlValue.Bytea binary -> add binary NpgsqlDbType.Bytea
+            | SqlValue.TimeWithTimeZone x -> add x NpgsqlDbType.TimeTz
+            | SqlValue.Null -> cmd.Parameters.AddWithValue(normalizedParameterName, DBNull.Value) |> ignore
+            | SqlValue.TinyInt x -> cmd.Parameters.AddWithValue(normalizedParameterName, x) |> ignore
+            | SqlValue.Jsonb x -> add x NpgsqlDbType.Jsonb
+            | SqlValue.Time x -> add x NpgsqlDbType.Time
+            | SqlValue.StringArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Text)
+            | SqlValue.IntArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Integer)
+            | SqlValue.ShortArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Smallint)
+            | SqlValue.LongArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Bigint)
+            | SqlValue.Real x -> add x NpgsqlDbType.Real
+            | SqlValue.Parameter x ->
+                x.ParameterName <- normalizedParameterName
+                ignore (cmd.Parameters.Add(x))
+            | SqlValue.Point x -> add x NpgsqlDbType.Point
+            | SqlValue.Interval x -> add x NpgsqlDbType.Interval
+
     let private populateCmd (cmd: NpgsqlCommand) (props: SqlProps) =
         if props.IsFunction then cmd.CommandType <- CommandType.StoredProcedure
         populateRow cmd props.Parameters
@@ -310,11 +351,13 @@ module Sql =
                             // when the parameter set is empty
                             affectedRowsByQuery.Add 0
                     else
+                        use batch = new NpgsqlBatch(connection, transaction)
                         for parameterSet in parameterSets do
-                            use command = new NpgsqlCommand(query, connection, transaction)
-                            populateRow command parameterSet
-                            let! affectedRows = command.ExecuteNonQueryAsync props.CancellationToken
-                            affectedRowsByQuery.Add affectedRows
+                            let batchCommand = new NpgsqlBatchCommand(query)
+                            populateBatchRow batchCommand parameterSet
+                            batch.BatchCommands.Add(batchCommand)
+                        let! affectedRows = batch.ExecuteNonQueryAsync props.CancellationToken
+                        affectedRowsByQuery.Add affectedRows
                 do! transaction.CommitAsync props.CancellationToken
                 return List.ofSeq affectedRowsByQuery
             finally
