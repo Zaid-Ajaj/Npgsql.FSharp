@@ -7,7 +7,7 @@ group Main
 
   nuget FSharp.Core >= 4.7.2
   nuget Ply 0.3.1
-  nuget Npgsql ~> 6.0.4
+  nuget Npgsql ~> 6.0
 
 group Build
   source https://api.nuget.org/v3/index.json

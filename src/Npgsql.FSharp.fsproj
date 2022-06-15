@@ -7,11 +7,11 @@
     <PackageIconUrl></PackageIconUrl>
     <PackageTags>fsharp;postgres;sql;ngpsql</PackageTags>
     <Authors>Zaid Ajaj</Authors>
-    <Version>5.0.1</Version>
+    <Version>5.1.0</Version>
     <TargetFrameworks>netstandard2.0</TargetFrameworks>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <LangVersion>latest</LangVersion>
-    <PackageReleaseNotes>Updated Npgsql to v6, faster batch queries with executeTransaction(Async) and source link support</PackageReleaseNotes>
+    <PackageReleaseNotes>Added Sql.includeErrorDetails to config</PackageReleaseNotes>
     <DebugType>embedded</DebugType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
