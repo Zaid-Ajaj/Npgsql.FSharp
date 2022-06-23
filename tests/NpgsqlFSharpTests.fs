@@ -1320,4 +1320,4 @@ let unknownColumnTest =
     }
 
 
-let allTests = testList "Npgsql.FSharp.Tasks" [ tests; unknownColumnTest ]
+let allTests = testList "Npgsql.FSharp" [ tests; unknownColumnTest ]

@@ -6,7 +6,6 @@ open NpgsqlTypes
 open System.Threading
 open System.Data
 open System.Security.Cryptography.X509Certificates
-open FSharp.Control.Tasks
 open System.Threading.Tasks
 
 /// Specifies how to manage SSL.
@@ -457,7 +456,7 @@ module Sql =
         }
 
     let iterAsync (perform: RowReader -> unit) (props: SqlProps) : Task =
-        unitTask {
+        task {
             if List.isEmpty props.SqlQuery
             then raise <| MissingQueryException "No query provided to execute. Please use Sql.query"
             let connection = createConnection props

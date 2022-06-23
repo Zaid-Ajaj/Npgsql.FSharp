@@ -18,9 +18,15 @@ let solutionRoot = Files.findParent __SOURCE_DIRECTORY__ "Npgsql.FSharp.sln";
 
 let src = path [ solutionRoot; "src" ]
 
+let tests = path [ solutionRoot; "tests" ]
+
 let build() =
     if Shell.Exec(Tools.dotnet, "build --configuration Release", solutionRoot) <> 0
     then failwith "build failed"
+
+let test() =
+    if Shell.Exec(Tools.dotnet, "run --configuration Release", tests) <> 0
+    then failwith "Tests failed"
 
 let pack() =
     Shell.deleteDir (path [ "src"; "bin" ])
@@ -63,7 +69,8 @@ let main (args: string[]) =
         match args with
         | [| "build"   |] -> build()
         | [| "pack"    |] -> pack()
-        | [| "publish" |] -> publish()
+        | [| "publish" |] -> test(); publish()
+        | [| "test" |] -> test()
         | otherwise -> printfn $"Unknown build args %A{otherwise}"
         0
     with ex ->

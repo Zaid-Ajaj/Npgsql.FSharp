@@ -7,23 +7,22 @@
     <PackageIconUrl></PackageIconUrl>
     <PackageTags>fsharp;postgres;sql;ngpsql</PackageTags>
     <Authors>Zaid Ajaj</Authors>
-    <Version>5.1.0</Version>
-    <TargetFrameworks>netstandard2.0</TargetFrameworks>
+    <Version>5.2.0</Version>
+    <TargetFramework>net6.0</TargetFramework>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <LangVersion>latest</LangVersion>
-    <PackageReleaseNotes>Added Sql.includeErrorDetails to config</PackageReleaseNotes>
+    <PackageReleaseNotes>Target net6.0 and remove Ply dependency and fix nuget package</PackageReleaseNotes>
     <DebugType>embedded</DebugType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0" PrivateAssets="All" />
+    <PackageReference Include="Npgsql" Version="6.0.5" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Common.fs" />
     <Compile Include="PostgresUri.fs" />
     <Compile Include="Npgsql.FSharp.fs" />
   </ItemGroup>
-
-  <Import Project="..\.paket\Paket.Restore.targets" />
 </Project>

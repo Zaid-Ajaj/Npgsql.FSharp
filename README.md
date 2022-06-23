@@ -369,3 +369,25 @@ let jsonFromDatabase =
     |> Sql.query "SELECT * FROM json_blobs"
     |> Sql.execute (fun read -> read.fieldValue<JsonBlob> "json_blob")
 ```
+
+### Building the solution
+
+Build the solution in the repository root directory:
+```bash
+dotnet build
+```
+
+### Running tests
+The tests are mostly integration tests and require a live postgres server running with the following defaults
+ - host: localhost
+ - port: 5432
+ - username: postgres
+ - password: postgres
+
+Then the tests will create and destroy test databases using [ThrowawayDb](https://github.com/Zaid-Ajaj/ThrowawayDb).
+
+Run the tests as follows
+```bash
+cd ./tests
+dotnet run
+```
