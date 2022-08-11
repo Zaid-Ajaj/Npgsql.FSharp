@@ -7,11 +7,11 @@
     <PackageIconUrl></PackageIconUrl>
     <PackageTags>fsharp;postgres;sql;ngpsql</PackageTags>
     <Authors>Zaid Ajaj</Authors>
-    <Version>5.2.0</Version>
+    <Version>5.3.0</Version>
     <TargetFramework>net6.0</TargetFramework>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <LangVersion>latest</LangVersion>
-    <PackageReleaseNotes>Target net6.0 and remove Ply dependency and fix nuget package</PackageReleaseNotes>
+    <PackageReleaseNotes>Implememt double array and decimal array functions</PackageReleaseNotes>
     <DebugType>embedded</DebugType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
@@ -19,6 +19,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0" PrivateAssets="All" />
     <PackageReference Include="Npgsql" Version="6.0.5" />
+    <PackageReference Update="FSharp.Core" Version="6.0.0" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Common.fs" />

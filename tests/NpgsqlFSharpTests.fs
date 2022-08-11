@@ -68,8 +68,8 @@ let buildDatabase() : ThrowawayDatabase =
     let createStringArrayTable = "create table if not exists string_array_test (id int, values text [])"
     let createUuidArrayTable = "create table if not exists uuid_array_test (id int, values uuid [])"
     let createIntArrayTable = "create table if not exists int_array_test (id int, integers int [])"
-    let createDoubleArrayTable = "create table if not exists double_array_test (id int, doubles double [])"
-    let createDecimalArrayTable = "create table if not exists decimal_array_test (id int, decimals number [])"
+    let createDoubleArrayTable = "create table if not exists double_array_test (id int, doubles double precision [])"
+    let createDecimalArrayTable = "create table if not exists decimal_array_test (id int, decimals money [])"
     let createPointTable = "create table if not exists point_test (id int, test_point point)"
     let createExtensionHStore = "create extension if not exists hstore"
     let createExtensionUuid = "create extension if not exists \"uuid-ossp\""
@@ -1074,13 +1074,12 @@ let tests =
                     |> ignore
 
                 use db = buildDatabase()
-                let connection : string = db.ConnectionString
-                seedDatabase connection
+                seedDatabase db.ConnectionString
 
                 let table =
-                    connection
+                    db.ConnectionString
                     |> Sql.connect
-                    |> Sql.query "SELECT * FROM int_array_test"
+                    |> Sql.query "SELECT * FROM double_array_test"
                     |> Sql.execute (fun read -> {
                         id = read.int "id"
                         doubles = read.doubleArray "doubles"
@@ -1112,13 +1111,11 @@ let tests =
                     |> ignore
 
                 use db = buildDatabase()
-                let connection : string = db.ConnectionString
-                seedDatabase connection
-
+                seedDatabase db.ConnectionString
                 let table =
-                    connection
+                    db.ConnectionString
                     |> Sql.connect
-                    |> Sql.query "SELECT * FROM int_decimal_test"
+                    |> Sql.query "SELECT * FROM decimal_array_test"
                     |> Sql.execute (fun read -> {
                         id = read.int "id"
                         decimals = read.decimalArray "decimals"
@@ -1130,7 +1127,7 @@ let tests =
                     { id = 3; decimals = c }
                 ]
 
-                Expect.equal expected table  "All rows from `decimal_array_test` table"
+                Expect.equal table expected  "All rows from `decimal_array_test` table"
             }
 
             test "Handle NpgsqlPoint" {
