@@ -34,6 +34,8 @@ type SqlValue =
     | IntArray of int array
     | ShortArray of int16 array
     | LongArray of int64 array
+    | DoubleArray of double array
+    | DecimalArray of decimal array
     | Point of NpgsqlPoint
     | Interval of TimeSpan
 
@@ -139,6 +141,12 @@ type Sql() =
     static member int64Array(value: int64[]) = SqlValue.LongArray value
     static member int64ArrayOrNone(value: int64[] option) = Utils.sqlMap value Sql.int64Array
     static member int64ArrayOrValueNone(value: int64[] voption) = Utils.sqlValueMap value Sql.int64Array
+    static member doubleArray(value: double[]) = SqlValue.DoubleArray value
+    static member doubleArrayOrNone(value: double[] option) = Utils.sqlMap value Sql.doubleArray
+    static member doubleArrayOrValueNone(value: double[] voption) = Utils.sqlValueMap value Sql.doubleArray
+    static member decimalArray(value: decimal[]) = SqlValue.DecimalArray value
+    static member decimalArrayOrNone(value: decimal[] option) = Utils.sqlMap value Sql.decimalArray
+    static member decimalArrayOrValueNone(value: decimal[] voption) = Utils.sqlValueMap value Sql.decimalArray
     static member dbnull = SqlValue.Null
     static member parameter(genericParameter: NpgsqlParameter) = SqlValue.Parameter genericParameter
     static member point(value: NpgsqlPoint) = SqlValue.Point value
@@ -267,6 +275,24 @@ type RowReader(reader: NpgsqlDataReader) =
         this.fieldValueOrNone(column)
 
     member this.int64ArrayOrValueNone(column: string) : int64[] voption =
+        this.fieldValueOrValueNone(column)
+
+    member this.doubleArray(column: string) : double[] =
+        this.fieldValue(column)
+
+    member this.doubleArrayOrNone(column: string) : double[] option =
+        this.fieldValueOrNone(column)
+
+    member this.doubleArrayOrValueNone(column: string) : double[] voption =
+        this.fieldValueOrValueNone(column)
+
+    member this.decimalArray(column: string) : decimal[] =
+        this.fieldValue(column)
+
+    member this.decimalArrayOrNone(column: string) : decimal[] option =
+        this.fieldValueOrNone(column)
+
+    member this.decimalArrayOrValueNone(column: string) : decimal[] voption =
         this.fieldValueOrValueNone(column)
 
     /// Reads the given column of type timestamptz as DateTimeOffset.

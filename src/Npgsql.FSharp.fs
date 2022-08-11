@@ -232,6 +232,8 @@ module Sql =
             | SqlValue.IntArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Integer)
             | SqlValue.ShortArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Smallint)
             | SqlValue.LongArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Bigint)
+            | SqlValue.DoubleArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Double)
+            | SqlValue.DecimalArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Numeric)
             | SqlValue.Real x -> add x NpgsqlDbType.Real
             | SqlValue.Parameter x ->
                 x.ParameterName <- normalizedParameterName
@@ -277,6 +279,8 @@ module Sql =
             | SqlValue.IntArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Integer)
             | SqlValue.ShortArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Smallint)
             | SqlValue.LongArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Bigint)
+            | SqlValue.DoubleArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Double)
+            | SqlValue.DecimalArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Numeric)
             | SqlValue.Real x -> add x NpgsqlDbType.Real
             | SqlValue.Parameter x ->
                 x.ParameterName <- normalizedParameterName
