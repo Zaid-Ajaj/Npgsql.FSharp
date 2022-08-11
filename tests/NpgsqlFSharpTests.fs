@@ -28,6 +28,16 @@ type IntArrayTest = {
     integers: int array
 }
 
+type DoubleArrayTest = {
+    id: int
+    doubles: double array
+}
+
+type DecimalArrayTest = {
+    id: int
+    decimals: decimal array
+}
+
 type UuidArrayTest = {
     id: int
     guids: Guid array
@@ -58,6 +68,8 @@ let buildDatabase() : ThrowawayDatabase =
     let createStringArrayTable = "create table if not exists string_array_test (id int, values text [])"
     let createUuidArrayTable = "create table if not exists uuid_array_test (id int, values uuid [])"
     let createIntArrayTable = "create table if not exists int_array_test (id int, integers int [])"
+    let createDoubleArrayTable = "create table if not exists double_array_test (id int, doubles double [])"
+    let createDecimalArrayTable = "create table if not exists decimal_array_test (id int, decimals number [])"
     let createPointTable = "create table if not exists point_test (id int, test_point point)"
     let createExtensionHStore = "create extension if not exists hstore"
     let createExtensionUuid = "create extension if not exists \"uuid-ossp\""
@@ -92,6 +104,8 @@ let buildDatabase() : ThrowawayDatabase =
         createStringArrayTable, [ ]
         createExtensionHStore, [ ]
         createIntArrayTable, [ ]
+        createDoubleArrayTable, [ ]
+        createDecimalArrayTable, [ ]
         createExtensionUuid, [ ]
         createUuidArrayTable, []
         createPointTable, []
@@ -1041,6 +1055,82 @@ let tests =
                 ]
 
                 Expect.equal expected table "All rows from `uuid_array_test` table"
+            }
+
+            test "Handle double Array" {
+                let a = [| 1.; 2. |]
+                let b = [| for i in 0..10 do yield (double i) |]
+                let c : double array = [||]
+                let seedDatabase (connection: string) =
+                    connection
+                    |> Sql.connect
+                    |> Sql.executeTransaction [
+                        "INSERT INTO double_array_test (id, doubles) values (@id, @doubles)", [
+                            [ "@id", Sql.int 1; "@doubles", Sql.doubleArray a ]
+                            [ "@id", Sql.int 2; "@doubles", Sql.doubleArray b ]
+                            [ "@id", Sql.int 3; "@doubles", Sql.doubleArray c ]
+                        ]
+                    ]
+                    |> ignore
+
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
+                seedDatabase connection
+
+                let table =
+                    connection
+                    |> Sql.connect
+                    |> Sql.query "SELECT * FROM int_array_test"
+                    |> Sql.execute (fun read -> {
+                        id = read.int "id"
+                        doubles = read.doubleArray "doubles"
+                    })
+
+                let expected = [
+                    { id = 1; doubles = a }
+                    { id = 2; doubles = b }
+                    { id = 3; doubles = c }
+                ]
+
+                Expect.equal expected table  "All rows from `double_array_test` table"
+            }
+
+            test "Handle decimal Array" {
+                let a = [| 1m; 2m |]
+                let b = [| for i in 0..10 do yield (decimal i) |]
+                let c : decimal array = [||]
+                let seedDatabase (connection: string) =
+                    connection
+                    |> Sql.connect
+                    |> Sql.executeTransaction [
+                        "INSERT INTO decimal_array_test (id, decimals) values (@id, @decimals)", [
+                            [ "@id", Sql.int 1; "@decimals", Sql.decimalArray a ]
+                            [ "@id", Sql.int 2; "@decimals", Sql.decimalArray b ]
+                            [ "@id", Sql.int 3; "@decimals", Sql.decimalArray c ]
+                        ]
+                    ]
+                    |> ignore
+
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
+                seedDatabase connection
+
+                let table =
+                    connection
+                    |> Sql.connect
+                    |> Sql.query "SELECT * FROM int_decimal_test"
+                    |> Sql.execute (fun read -> {
+                        id = read.int "id"
+                        decimals = read.decimalArray "decimals"
+                    })
+
+                let expected = [
+                    { id = 1; decimals = a }
+                    { id = 2; decimals = b }
+                    { id = 3; decimals = c }
+                ]
+
+                Expect.equal expected table  "All rows from `decimal_array_test` table"
             }
 
             test "Handle NpgsqlPoint" {
