@@ -411,13 +411,13 @@ type RowReader(reader: NpgsqlDataReader) =
         this.fieldValueOrValueNone(column)
 
     /// Gets the value of the specified column as a System.DateOnly object.
-    member this.date(column: string) : DateOnly =
+    member this.dateOnly(column: string) : DateOnly =
         this.fieldValue(column)
 
-    member this.dateOrNone(column: string) : DateOnly option =
+    member this.dateOnlyOrNone(column: string) : DateOnly option =
         this.fieldValueOrNone(column)
 
-    member this.dateOrValueNone(column: string) : DateOnly voption =
+    member this.dateOnlyOrValueNone(column: string) : DateOnly voption =
         this.fieldValueOrValueNone(column)
 
     /// Gets the value of the specified column as a System.DateTime object.
