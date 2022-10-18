@@ -672,6 +672,58 @@ let tests =
                 |> fun timestamp -> Expect.equal (timestamp.ToUnixTimeSeconds()) (value.ToUnixTimeSeconds()) "The values are the same"
             }
 
+            test "DateTime as date roundtrip" {
+                use db = buildDatabase()
+
+                let value = DateTime.Now
+
+                db.ConnectionString
+                |> Sql.connect
+                |> Sql.query "SELECT @date::date as value"
+                |> Sql.parameters [ "@date", Sql.date value ]
+                |> Sql.executeRow (fun read -> read.date "value")
+                |> fun date -> Expect.equal date (DateOnly.FromDateTime value) "The values are the same"
+            }
+
+            test "DateOnly as date roundtrip" {
+                use db = buildDatabase()
+
+                let value = DateOnly.FromDateTime DateTime.Now
+
+                db.ConnectionString
+                |> Sql.connect
+                |> Sql.query "SELECT @date::date as value"
+                |> Sql.parameters [ "@date", Sql.date value ]
+                |> Sql.executeRow (fun read -> read.date "value")
+                |> fun date -> Expect.equal date value "The values are the same"
+            }
+
+            test "None DateOnly as date roundtrip" {
+                use db = buildDatabase()
+
+                let value: DateOnly option = None
+
+                db.ConnectionString
+                |> Sql.connect
+                |> Sql.query "SELECT @date::date as value"
+                |> Sql.parameters [ "@date", Sql.dateOrNone value ]
+                |> Sql.executeRow (fun read -> read.dateOrNone "value")
+                |> fun date -> Expect.equal date value "The values are the same"
+            }
+
+            test "ValueSome DateOnly option as date roundtrip" {
+                use db = buildDatabase()
+
+                let value = DateOnly.FromDateTime DateTime.Now |> ValueSome
+
+                db.ConnectionString
+                |> Sql.connect
+                |> Sql.query "SELECT @date::date as value"
+                |> Sql.parameters [ "@date", Sql.dateOrValueNone value ]
+                |> Sql.executeRow (fun read -> read.dateOrValueNone "value")
+                |> fun date -> Expect.equal date value "The values are the same"
+            }
+
             test "uuid_generate_v4()" {
                 use db = buildDatabase()
                 db.ConnectionString
