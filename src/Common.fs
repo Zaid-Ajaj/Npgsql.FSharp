@@ -15,7 +15,7 @@ type SqlValue =
     | Int of int
     | Long of int64
     | String of string
-    | Date of DateTime
+    | Date of Choice<DateTime, DateOnly>
     | Bit of bool
     | Bool of bool
     | Number of double
@@ -90,6 +90,12 @@ type Sql() =
     static member int64(value: int64) = SqlValue.Long value
     static member int64OrNone(value: int64 option) = Utils.sqlMap value Sql.int64
     static member int64OrValueNone(value: int64 voption) = Utils.sqlValueMap value Sql.int64
+    static member date(value: DateTime) = SqlValue.Date (Choice1Of2 value)
+    static member dateOrNone(value: DateTime option) = Utils.sqlMap value Sql.date
+    static member dateOrValueNone(value: DateTime voption) = Utils.sqlValueMap value Sql.date
+    static member date(value: DateOnly) = SqlValue.Date (Choice2Of2 value)
+    static member dateOrNone(value: DateOnly option) = Utils.sqlMap value Sql.date
+    static member dateOrValueNone(value: DateOnly voption) = Utils.sqlValueMap value Sql.date
     static member timestamp(value: DateTime) = SqlValue.Timestamp value
     static member timestampOrNone(value: DateTime option) = Utils.sqlMap value Sql.timestamp
     static member timestampOrValueNone(value: DateTime voption) = Utils.sqlValueMap value Sql.timestamp
@@ -402,6 +408,16 @@ type RowReader(reader: NpgsqlDataReader) =
         this.fieldValue(column)
 
     member this.uuidArrayOrValueNone(column: string) : Guid [] voption =
+        this.fieldValueOrValueNone(column)
+
+    /// Gets the value of the specified column as a System.DateOnly object.
+    member this.dateOnly(column: string) : DateOnly =
+        this.fieldValue(column)
+
+    member this.dateOnlyOrNone(column: string) : DateOnly option =
+        this.fieldValueOrNone(column)
+
+    member this.dateOnlyOrValueNone(column: string) : DateOnly voption =
         this.fieldValueOrValueNone(column)
 
     /// Gets the value of the specified column as a System.DateTime object.
