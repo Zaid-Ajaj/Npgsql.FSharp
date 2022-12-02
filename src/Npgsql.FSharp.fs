@@ -262,7 +262,8 @@ module Sql =
             | SqlValue.Uuid uuid -> add uuid NpgsqlDbType.Uuid
             | SqlValue.UuidArray uuidArray -> add uuidArray (NpgsqlDbType.Array ||| NpgsqlDbType.Uuid)
             | SqlValue.Short number -> add number NpgsqlDbType.Smallint
-            | SqlValue.Date date -> add date NpgsqlDbType.Date
+            | SqlValue.Date (Choice1Of2 dateTime) -> add dateTime NpgsqlDbType.Date
+            | SqlValue.Date (Choice2Of2 dateOnly) -> add dateOnly NpgsqlDbType.Date
             | SqlValue.Timestamp timestamp -> add timestamp NpgsqlDbType.Timestamp
             | SqlValue.TimestampWithTimeZone timestampTz -> add timestampTz NpgsqlDbType.TimestampTz
             | SqlValue.Number number -> add number NpgsqlDbType.Double

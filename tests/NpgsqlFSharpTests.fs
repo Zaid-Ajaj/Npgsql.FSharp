@@ -288,6 +288,44 @@ let tests =
                 |> fun count -> Expect.equal count 0 "Count is zero"
             }
 
+            test "Sql.executeTransaction works with DateTime" {
+                use db = buildDatabase()
+                Sql.connect db.ConnectionString
+                |> Sql.query "CREATE TABLE users (user_id serial primary key, birthdate date)"
+                |> Sql.executeNonQuery
+                |> ignore
+
+                let date = DateTime.Now
+
+                Sql.connect db.ConnectionString
+                |> Sql.executeTransaction [
+                    "INSERT INTO users (birthdate) VALUES (@birthdate)", [
+                        [ ("@birthdate", Sql.dateOrNone (Some date)) ]
+                        [ ("@birthdate", Sql.dateOrNone Option<DateTime>.None) ]
+                    ]
+                ]
+                |> ignore
+            }
+
+            test "Sql.executeTransaction works with DateOnly" {
+                use db = buildDatabase()
+                Sql.connect db.ConnectionString
+                |> Sql.query "CREATE TABLE users (user_id serial primary key, birthdate date)"
+                |> Sql.executeNonQuery
+                |> ignore
+
+                let date = DateOnly.FromDateTime DateTime.Now
+
+                Sql.connect db.ConnectionString
+                |> Sql.executeTransaction [
+                    "INSERT INTO users (birthdate) VALUES (@birthdate)", [
+                        [ ("@birthdate", Sql.dateOrNone (Some date)) ]
+                        [ ("@birthdate", Sql.dateOrNone Option<DateOnly>.None) ]
+                    ]
+                ]
+                |> ignore
+            }
+
             test "Parameter names can contain trailing spaces" {
                 use db = buildDatabase()
                 use connection = new NpgsqlConnection(db.ConnectionString)
