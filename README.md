@@ -167,7 +167,7 @@ let filmTitles(connectionString: string) =
 
     titles
 ```
-### Use an existing connections
+### Use an existing connection
 Sometimes, you already have constructed a `NpgsqlConnection` and want to use with the `Sql` module. You can use the function `Sql.existingConnection` which takes a preconfigured connection from which the queries or transactions are executed. Note that this library will *open the connection* if it is not already open and it will leave the connection open (deos not dispose of it) when it finishes running. This means that you have to manage the disposal of the connection yourself:
 ```fs
 use connection = new NpgsqlConnection("YOUR CONNECTION STRING")
@@ -184,6 +184,22 @@ let users =
         })
 ```
 Note in this example, when we write `use connection = ...` it means the connection will be disposed at the end of the scope where this value is bound, not internally from the `Sql` module.
+
+### Use a data source
+.NET 7 introduced the `DbDataSource` type, implemented by Npgsql as `NpgsqlDataSource`. If you already have a constructed data source, using the function `Sql.fromDataSource` lets you use it to obtain connections from which the queries or transactions are executed.
+```fs
+use dataSource = NpgsqlDataSource.Create("YOUR CONNECTION STRING")
+
+let users =
+    dataSource
+    |> Sql.fromDataSource
+    |> Sql.query "SELECT * FROM users"
+    |> Sql.execute (fun read ->
+        {
+            Id = read.int "user_id"
+            FirstName = read.text "first_name"
+        })
+```
 
 ### Reading values from the underlying `NpgsqlDataReader`
 When running the `Sql.execute` function, you can read values directly from the `NpgsqlDataReader` as opposed to using the provided `RowReader`. Instead of writing this:
