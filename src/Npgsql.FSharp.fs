@@ -29,6 +29,7 @@ module Sql =
     type ExecutionTarget =
         | ConnectionString of string
         | Connection of NpgsqlConnection
+        | DataSource of NpgsqlDataSource
         | Empty
 
     type ConnectionStringBuilder = private {
@@ -165,6 +166,8 @@ module Sql =
 
     /// Uses an existing connection to execute SQL commands against
     let existingConnection (connection: NpgsqlConnection) = { defaultProps() with ExecutionTarget = Connection connection }
+    /// Uses a data source to obtain the connection to execute SQL commands against
+    let fromDataSource (dataSource: NpgsqlDataSource) = { defaultProps() with ExecutionTarget = DataSource dataSource }
     /// Configures the SQL query to execute
     let query (sql: string) props = { props with SqlQuery = [sql] }
     let func (sql: string) props = { props with SqlQuery = [sql]; IsFunction = true }
@@ -186,12 +189,14 @@ module Sql =
             connection
 
         | Connection existingConnection -> existingConnection
+        | DataSource dataSource -> dataSource.OpenConnection()
         | Empty -> failwith "Could not create a connection from empty parameters."
 
     let private makeCommand (props: SqlProps) (connection: NpgsqlConnection) =
         match props.ExecutionTarget with
         | ConnectionString _
-        | Connection _ -> new NpgsqlCommand(List.head props.SqlQuery, connection)
+        | Connection _
+        | DataSource _ -> new NpgsqlCommand(List.head props.SqlQuery, connection)
         | Empty -> failwith "Cannot create command from an empty execution target"
 
     let private populateRow (cmd: NpgsqlCommand) (row: (string * SqlValue) list) =
@@ -331,7 +336,8 @@ module Sql =
             List.ofSeq affectedRowsByQuery
         finally
             match props.ExecutionTarget with
-            | ConnectionString _ -> connection.Dispose()
+            | ConnectionString _
+            | DataSource _ -> connection.Dispose()
             | _ ->
                 // leave connections open
                 // when provided from outside
@@ -373,7 +379,8 @@ module Sql =
                 return List.ofSeq affectedRowsByQuery
             finally
                 match props.ExecutionTarget with
-                | ConnectionString _ -> connection.Dispose()
+                | ConnectionString _
+                | DataSource _ -> connection.Dispose()
                 | _ -> ()
         }
 
@@ -395,7 +402,8 @@ module Sql =
             List.ofSeq result
         finally
             match props.ExecutionTarget with
-            | ConnectionString _ -> connection.Dispose()
+            | ConnectionString _
+            | DataSource _ -> connection.Dispose()
             | _ -> ()
 
     let iter (perform: RowReader -> unit) (props: SqlProps) : unit =
@@ -414,7 +422,8 @@ module Sql =
             while reader.Read() do perform rowReader
         finally
             match props.ExecutionTarget with
-            | ConnectionString _ -> connection.Dispose()
+            | ConnectionString _
+            | DataSource _ -> connection.Dispose()
             | _ -> ()
 
     let executeRow (read: RowReader -> 't) (props: SqlProps) : 't =
@@ -435,7 +444,8 @@ module Sql =
             else raise <| NoResultsException "Expected at least one row to be returned from the result set. Instead it was empty"
         finally
             match props.ExecutionTarget with
-            | ConnectionString _ -> connection.Dispose()
+            | ConnectionString _
+            | DataSource _ -> connection.Dispose()
             | _ -> ()
 
     let executeAsync (read: RowReader -> 't) (props: SqlProps) : Task<'t list> =
@@ -457,7 +467,8 @@ module Sql =
                 return List.ofSeq result
             finally
                 match props.ExecutionTarget with
-                | ConnectionString _ -> connection.Dispose()
+                | ConnectionString _
+                | DataSource _ -> connection.Dispose()
                 | _ -> ()
         }
 
@@ -478,7 +489,8 @@ module Sql =
                 while reader.Read() do perform rowReader
             finally
                 match props.ExecutionTarget with
-                | ConnectionString _ -> connection.Dispose()
+                | ConnectionString _
+                | DataSource _ -> connection.Dispose()
                 | _ -> ()
         }
 
@@ -501,7 +513,8 @@ module Sql =
                 else return! raise <| NoResultsException "Expected at least one row to be returned from the result set. Instead it was empty"
             finally
                 match props.ExecutionTarget with
-                | ConnectionString _ -> connection.Dispose()
+                | ConnectionString _
+                | DataSource _ -> connection.Dispose()
                 | _ -> ()
         }
 
@@ -519,7 +532,8 @@ module Sql =
             command.ExecuteNonQuery()
         finally
             match props.ExecutionTarget with
-            | ConnectionString _ -> connection.Dispose()
+            | ConnectionString _
+            | DataSource _ -> connection.Dispose()
             | _ -> ()
 
     /// Executes the query as asynchronously and returns the number of rows affected
@@ -538,6 +552,7 @@ module Sql =
                 return affectedRows
             finally
                 match props.ExecutionTarget with
-                | ConnectionString _ -> connection.Dispose()
+                | ConnectionString _
+                | DataSource _ -> connection.Dispose()
                 | _ -> ()
         }
