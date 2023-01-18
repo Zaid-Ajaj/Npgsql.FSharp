@@ -58,7 +58,7 @@ let publish() =
             |> Seq.head
             |> Path.GetFullPath
 
-        if Shell.Exec(Tools.dotnet, sprintf "nuget push %s -s nuget.org -k %s" nugetPath nugetKey, src) <> 0
+        if Shell.Exec(Tools.dotnet, sprintf "nuget push %s -s https://api.nuget.org/v3/index.json -k %s" nugetPath nugetKey, src) <> 0
         then failwith "Publish failed"
 
 [<EntryPoint>]
