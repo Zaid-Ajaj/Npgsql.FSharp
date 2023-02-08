@@ -28,16 +28,6 @@ let test() =
     if Shell.Exec(Tools.dotnet, "run --configuration Release", tests) <> 0
     then failwith "Tests failed"
 
-let pack() =
-    Shell.deleteDir (path [ "src"; "bin" ])
-    Shell.deleteDir (path [ "src"; "obj" ])
-    if Shell.Exec(Tools.dotnet, "pack --configuration Release", src) <> 0 then
-        failwith "Pack failed"
-    else
-        let outputPath = path [ src; "bin"; "Release" ]
-        if Shell.Exec(Tools.dotnet, sprintf "tool install -g hawaii --add-source %s" outputPath) <> 0
-        then failwith "Local install failed"
-
 let publish() =
     Shell.deleteDir (path [ src; "bin" ])
     Shell.deleteDir (path [ src; "obj" ])
@@ -68,7 +58,6 @@ let main (args: string[]) =
     try
         match args with
         | [| "build"   |] -> build()
-        | [| "pack"    |] -> pack()
         | [| "publish" |] -> test(); publish()
         | [| "test" |] -> test()
         | otherwise -> printfn $"Unknown build args %A{otherwise}"
