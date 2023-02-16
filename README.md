@@ -167,6 +167,19 @@ let filmTitles(connectionString: string) =
 
     titles
 ```
+
+### `Sql.toSeq`: Wrapping execution of the query in a sequence
+The function `Sql.iter` works well for really large datasets (> 100K of rows) without performance issues, but it forces you to provide a callback function, so that it can push the rows to you. If you want to pull the rows, you can use `Sql.toSeq` to wrap the whole execution in a sequence that yields the rows. The execution of the query starts each time when you start an iteration over the sequence:
+```fs
+let getFilmTitlesAsSeq(connectionString: string) =
+    connectionString
+    |> Sql.connect
+    |> Sql.query "SELECT title FROM film"
+    |> Sql.toSeq (fun read -> read.text "title")
+    |> Seq.indexed
+    |> Seq.map (fun (i, title) -> sprintf "%i. %s") (i + 1) title
+```
+
 ### Use an existing connection
 Sometimes, you already have constructed a `NpgsqlConnection` and want to use with the `Sql` module. You can use the function `Sql.existingConnection` which takes a preconfigured connection from which the queries or transactions are executed. Note that this library will *open the connection* if it is not already open and it will leave the connection open (deos not dispose of it) when it finishes running. This means that you have to manage the disposal of the connection yourself:
 ```fs

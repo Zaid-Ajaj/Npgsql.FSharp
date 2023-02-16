@@ -556,3 +556,27 @@ module Sql =
                 | DataSource _ -> connection.Dispose()
                 | _ -> ()
         }
+
+    /// Wraps the execution of the query in a sequence
+    let toSeq (read: RowReader -> 't) (props: SqlProps) =
+        seq {
+            if List.isEmpty props.SqlQuery
+            then raise <| MissingQueryException "No query provided to execute. Please use Sql.query"
+            let connection = createConnection props
+            try
+                if not (connection.State.HasFlag ConnectionState.Open)
+                then connection.Open()
+                use command = makeCommand props connection
+                do populateCmd command props
+                if props.NeedPrepare then command.Prepare()
+                use reader = command.ExecuteReader()
+                let postgresReader = unbox<NpgsqlDataReader> reader
+                let rowReader = RowReader(postgresReader)
+                while reader.Read() do 
+                    yield read rowReader
+            finally
+                match props.ExecutionTarget with
+                | ConnectionString _
+                | DataSource _ -> connection.Dispose()
+                | _ -> ()
+        }
