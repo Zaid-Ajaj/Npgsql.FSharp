@@ -648,6 +648,53 @@ let tests =
                 |> Sql.executeNonQuery
                 |> fun rowsAffected -> Expect.equal 3 rowsAffected "Three entries are deleted"
             }
+
+            test "Sql.toSeq works" {
+                use db = buildDatabase()
+                Sql.connect db.ConnectionString
+                |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
+                |> Sql.executeNonQuery
+                |> ignore
+
+                Sql.connect db.ConnectionString
+                |> Sql.executeTransaction [
+                    "INSERT INTO users (username, active, salary) VALUES (@username, @active, @salary)", [
+                        [ ("@username", Sql.text "first"); ("active", Sql.bit true); ("salary", Sql.money 1.0M)  ]
+                        [ ("@username", Sql.text "second"); ("active", Sql.bit false); ("salary", Sql.money 1.0M) ]
+                        [ ("@username", Sql.text "third"); ("active", Sql.bit true);("salary", Sql.money 1.0M) ]
+                    ]
+                ]
+                |> ignore
+
+                let expected = [
+                    {| userId = 1; username = "first"; active = true; salary = 1.0M  |}
+                    {| userId = 2; username = "second"; active = false ; salary = 1.0M |}
+                    {| userId = 3; username = "third"; active = true ; salary = 1.0M |}
+                ]
+                
+                let sequence =
+                    Sql.connect db.ConnectionString
+                    |> Sql.query "SELECT * FROM users"
+                    |> Sql.toSeq (fun read ->
+                        {|
+                            userId = read.int "user_id"
+                            username = read.string "username"
+                            active = read.bool "active"
+                            salary = read.decimal "salary"
+                        |})
+                
+                let expectCorrectResults message =
+                    sequence
+                    |> Seq.toList
+                    |> List.sortBy (fun u -> u.userId)
+                    |> fun users -> Expect.equal users expected message
+
+                // Iterate over the sequence the first time
+                expectCorrectResults "Users can be read correctly on first iteration"
+
+                // Iterate over the sequence a second time
+                expectCorrectResults "Users can be read correctly on second iteration"
+            }
         ]
 
         testAsync "async query execution works" {
