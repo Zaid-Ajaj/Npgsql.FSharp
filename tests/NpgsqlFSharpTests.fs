@@ -1409,6 +1409,29 @@ let tests =
 
                 Expect.equal expected table "All rows from `uuid_array_test` table"
             }
+            
+            test "Handle nullable UUID Array" {
+                use db = buildDatabase()
+                let connection : string = db.ConnectionString
+                
+                let table =
+                    connection
+                    |> Sql.connect
+                    |> Sql.query """select
+    values
+from (
+    values (null), ('{97236cb5-fecc-4cee-8602-36d460e547b7}'::uuid[]), ('{}'::uuid[])
+) s(values)"""
+                    |> Sql.execute (fun read -> read.uuidArrayOrNone "values")
+
+                let expected = [
+                    None
+                    Some [| Guid "97236cb5-fecc-4cee-8602-36d460e547b7" |]
+                    Some [|  |]
+                ]
+
+                Expect.equal expected table "All rows"
+            }
 
             test "Handle double Array" {
                 let a = [| 1.; 2. |]

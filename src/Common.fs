@@ -405,7 +405,7 @@ type RowReader(reader: NpgsqlDataReader) =
         this.fieldValue(column)
 
     member this.uuidArrayOrNone(column: string) : Guid [] option =
-        this.fieldValue(column)
+        this.fieldValueOrNone(column)
 
     member this.uuidArrayOrValueNone(column: string) : Guid [] voption =
         this.fieldValueOrValueNone(column)
