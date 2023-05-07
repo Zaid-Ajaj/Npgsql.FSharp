@@ -118,52 +118,6 @@ module Sql =
 
     /// Turns the given postgres Uri into a proper connection string
     let fromUri (uri: Uri) = uri.ToPostgresConnectionString()
-    /// Creates initial database connection configuration from a the Uri components.
-    /// It try to find `Host`, `Username`, `Password`, `Database` and `Port` from the input `Uri`.
-    let fromUriToConfig (uri: Uri) =
-        let extractHost (uri: Uri) =
-            if String.IsNullOrWhiteSpace uri.Host
-            then Some ("Host", "localhost")
-            else Some ("Host", uri.Host)
-
-        let extractUser (uri: Uri) =
-            if uri.UserInfo.Contains ":" then
-                match uri.UserInfo.Split ':' with
-                | [| username; password|] ->
-                  [ ("Username", username); ("Password", password) ]
-                | otherwise -> [ ]
-            elif not (String.IsNullOrWhiteSpace uri.UserInfo) then
-                ["Username", uri.UserInfo ]
-            else
-                [ ]
-
-        let extractDatabase (uri: Uri) =
-            match uri.LocalPath.Split '/' with
-            | [| ""; databaseName |] -> Some ("Database", databaseName)
-            | otherwise -> None
-
-        let extractPort (uri: Uri) =
-            match uri.Port with
-            | -1 -> Some ("Port", "5432")
-            | n -> Some ("Port", string n)
-
-        let uriParts =
-            [ extractHost uri; extractDatabase uri; extractPort uri ]
-            |> List.choose id
-            |> List.append (extractUser uri)
-
-        let updateConfig config (partName, value) =
-            match partName with
-            | "Host" -> { config with Host = value }
-            | "Username" -> { config with Username = Some value }
-            | "Password" -> { config with Password = Some value }
-            | "Database" -> { config with Database = value }
-            | "Port" -> { config with Port = Some (int value) }
-            | otherwise -> config
-
-        (defaultConString(), uriParts)
-        ||> List.fold updateConfig
-
     /// Uses an existing connection to execute SQL commands against
     let existingConnection (connection: NpgsqlConnection) = { defaultProps() with ExecutionTarget = Connection connection }
     /// Uses a data source to obtain the connection to execute SQL commands against
