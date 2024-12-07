@@ -3,10 +3,10 @@ module NgpsqlFSharpTests
 open Expecto
 open Npgsql.FSharp
 open System
-open ThrowawayDb.Postgres
 open Npgsql
 open System.Data
 open System.Linq
+open Testcontainers.PostgreSql
 
 type FsTest = {
     test_id: int
@@ -60,7 +60,7 @@ type JsonBlob =
     prop2: string
   }
 
-let buildDatabase() : ThrowawayDatabase =
+let buildDatabase() : PostgreSqlContainer =
     let createFSharpTable = "create table if not exists fsharp_test (test_id int, test_name text)"
     let createJsonbTable = "create table if not exists data_with_jsonb (data jsonb)"
     let createTimestampzTable = "create table if not exists timestampz_test (version integer, date1 timestamptz, date2 timestamptz)"
@@ -74,27 +74,12 @@ let buildDatabase() : ThrowawayDatabase =
     let createExtensionHStore = "create extension if not exists hstore"
     let createExtensionUuid = "create extension if not exists \"uuid-ossp\""
 
-    // Travis CI uses an empty string for the password of the database
-    let databasePassword =
-        let runningTravis = Environment.GetEnvironmentVariable "TESTING_IN_TRAVISCI"
-        if isNull runningTravis || String.IsNullOrWhiteSpace runningTravis
-        then
-            let localPwd = Environment.GetEnvironmentVariable "Npgsql.Fsharp.DbPwd"
-            if String.IsNullOrWhiteSpace localPwd
-            then "postgres" // for local tests
-            else localPwd
-        else "" // for Travis CI
 
-    let connection =
-        Sql.host "localhost"
-        |> Sql.port 5432
-        |> Sql.username "postgres"
-        |> Sql.password databasePassword
-        |> Sql.formatConnectionString
+    let postgreSqlContainer = (new PostgreSqlBuilder()).WithImage("postgres:16").Build();
 
-    let database = ThrowawayDatabase.Create(connection)
+    postgreSqlContainer.StartAsync().Wait()
 
-    database.ConnectionString
+    postgreSqlContainer.GetConnectionString()
     |> Sql.connect
     |> Sql.executeTransaction [
         createFSharpTable, [ ]
@@ -112,19 +97,23 @@ let buildDatabase() : ThrowawayDatabase =
     ]
     |> ignore
 
-    database
+    postgreSqlContainer
 
 let tests =
+    
     testList "Integration tests" [
         testList "RowReader tests used in Sql.read and Sql.readAsync" [
             test "Sql.executeTransaction works" {
-                use db = buildDatabase()
-                Sql.connect db.ConnectionString
+                
+                let db = buildDatabase()
+                db.GetConnectionString()
+                |> Sql.connect 
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
                 |> Sql.executeNonQuery
                 |> ignore
-
-                Sql.connect db.ConnectionString
+                
+                db.GetConnectionString()
+                |> Sql.connect 
                 |> Sql.executeTransaction [
                     "INSERT INTO users (username, active, salary) VALUES (@username, @active, @salary)", [
                         [ ("@username", Sql.text "first"); ("active", Sql.bit true); ("salary", Sql.money 1.0M)  ]
@@ -140,7 +129,8 @@ let tests =
                     {| userId = 3; username = "third"; active = true ; salary = 1.0M |}
                 ]
 
-                Sql.connect db.ConnectionString
+                db.GetConnectionString()
+                |> Sql.connect
                 |> Sql.query "SELECT * FROM users"
                 |> Sql.execute (fun read ->
                     {|
@@ -153,14 +143,15 @@ let tests =
             }
 
             test "Sql.executeRow works" {
-                use db = buildDatabase()
-                db.ConnectionString
+                let db = buildDatabase()
+
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null)"
                 |> Sql.executeNonQuery
                 |> ignore
 
-                db.ConnectionString
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "SELECT COUNT(*) as user_count FROM users"
                 |> Sql.executeRow (fun read -> read.int64 "user_count")
@@ -168,15 +159,16 @@ let tests =
             }
 
             test "Sql.iter works" {
-                use db = buildDatabase()
-                db.ConnectionString
+                let db = buildDatabase()
+
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null)"
                 |> Sql.executeNonQuery
                 |> ignore
 
                 let mutable count = -1
-                db.ConnectionString
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "SELECT COUNT(*) as user_count FROM users"
                 |> Sql.iter (fun read -> count <- read.int "user_count")
@@ -184,15 +176,15 @@ let tests =
             }
 
             test "Manual transaction handling works with Sql.executeNonQuery" {
-                use db = buildDatabase()
+                let db = buildDatabase()
 
-                db.ConnectionString
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null)"
                 |> Sql.executeNonQuery
                 |> ignore
 
-                use connection = new NpgsqlConnection(db.ConnectionString)
+                use connection = new NpgsqlConnection(db.GetConnectionString())
                 connection.Open()
                 use transaction = connection.BeginTransaction()
                 let results = ResizeArray()
@@ -210,7 +202,7 @@ let tests =
                 else
                     transaction.Commit()
 
-                db.ConnectionString
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "SELECT COUNT(*) as user_count FROM users"
                 |> Sql.executeRow (fun read -> read.int "user_count")
@@ -218,15 +210,15 @@ let tests =
             }
 
             test "Manual transaction handling works with Sql.executeNonQuery and can be rolled back" {
-                use db = buildDatabase()
+                let db = buildDatabase()
 
-                db.ConnectionString
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null)"
                 |> Sql.executeNonQuery
                 |> ignore
 
-                use connection = new NpgsqlConnection(db.ConnectionString)
+                use connection = new NpgsqlConnection(db.GetConnectionString())
                 connection.Open()
                 use transaction = connection.BeginTransaction()
                 let results = ResizeArray()
@@ -245,7 +237,7 @@ let tests =
                 with
                 | _ -> transaction.Rollback()
 
-                db.ConnectionString
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "SELECT COUNT(*) as user_count FROM users"
                 |> Sql.executeRow (fun read -> read.int "user_count")
@@ -253,8 +245,8 @@ let tests =
             }
 
             testAsync "Sql.iterAsync works" {
-                use db = buildDatabase()
-                db.ConnectionString
+                let db = buildDatabase()
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null)"
                 |> Sql.executeNonQuery
@@ -263,7 +255,7 @@ let tests =
                 let mutable count = -1
 
                 do!
-                    db.ConnectionString
+                    db.GetConnectionString()
                     |> Sql.connect
                     |> Sql.query "SELECT COUNT(*) as user_count FROM users"
                     |> Sql.iterAsync (fun read -> count <- read.int "user_count")
@@ -274,14 +266,14 @@ let tests =
 
 
             test "Reading count as int works" {
-                use db = buildDatabase()
-                db.ConnectionString
+                let db = buildDatabase()
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null)"
                 |> Sql.executeNonQuery
                 |> ignore
 
-                db.ConnectionString
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "SELECT COUNT(*) as user_count FROM users"
                 |> Sql.executeRow (fun read -> read.int "user_count")
@@ -289,15 +281,17 @@ let tests =
             }
 
             test "Sql.executeTransaction works with DateTime" {
-                use db = buildDatabase()
-                Sql.connect db.ConnectionString
+                let db = buildDatabase()
+                db.GetConnectionString()
+                |> Sql.connect
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, birthdate date)"
                 |> Sql.executeNonQuery
                 |> ignore
 
                 let date = DateTime.Now
 
-                Sql.connect db.ConnectionString
+                db.GetConnectionString()
+                |> Sql.connect
                 |> Sql.executeTransaction [
                     "INSERT INTO users (birthdate) VALUES (@birthdate)", [
                         [ ("@birthdate", Sql.dateOrNone (Some date)) ]
@@ -308,15 +302,17 @@ let tests =
             }
 
             test "Sql.executeTransaction works with DateOnly" {
-                use db = buildDatabase()
-                Sql.connect db.ConnectionString
+                let db = buildDatabase()
+                db.GetConnectionString()
+                |> Sql.connect
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, birthdate date)"
                 |> Sql.executeNonQuery
                 |> ignore
 
                 let date = DateOnly.FromDateTime DateTime.Now
 
-                Sql.connect db.ConnectionString
+                db.GetConnectionString()
+                |> Sql.connect
                 |> Sql.executeTransaction [
                     "INSERT INTO users (birthdate) VALUES (@birthdate)", [
                         [ ("@birthdate", Sql.dateOrNone (Some date)) ]
@@ -327,8 +323,8 @@ let tests =
             }
 
             test "Parameter names can contain trailing spaces" {
-                use db = buildDatabase()
-                use connection = new NpgsqlConnection(db.ConnectionString)
+                let db = buildDatabase()
+                use connection = new NpgsqlConnection(db.GetConnectionString())
                 connection.Open()
                 Sql.existingConnection connection
                 |> Sql.query "CREATE TABLE test (test_id serial primary key, integers int [])"
@@ -350,15 +346,15 @@ let tests =
             }
 
             testAsync "Sql.executeRowAsync works" {
-                use db = buildDatabase()
-                db.ConnectionString
+                let db = buildDatabase()
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null)"
                 |> Sql.executeNonQuery
                 |> ignore
 
                 let! count =
-                    db.ConnectionString
+                    db.GetConnectionString()
                     |> Sql.connect
                     |> Sql.query "SELECT COUNT(*) as user_count FROM users"
                     |> Sql.executeRowAsync (fun read -> read.int64 "user_count")
@@ -368,14 +364,14 @@ let tests =
             }
 
             test "Sql.executeTransaction doesn't error out on parameterized queries with empty parameter sets" {
-                use db = buildDatabase()
-                db.ConnectionString
+                let db = buildDatabase()
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null)"
                 |> Sql.executeNonQuery
                 |> ignore
 
-                db.ConnectionString
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.executeTransaction [
                     "INSERT INTO users (username) VALUES (@username)", [ ]
@@ -384,15 +380,15 @@ let tests =
             }
 
             testAsync "Sql.executeTransactionAsync doesn't error out on parameterized queries with empty parameter sets" {
-                use db = buildDatabase()
-                db.ConnectionString
+                let db = buildDatabase()
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null)"
                 |> Sql.executeNonQuery
                 |> ignore
 
                 let! affectedRows =
-                    db.ConnectionString
+                    db.GetConnectionString()
                     |> Sql.connect
                     |> Sql.executeTransactionAsync [
                         "INSERT INTO users (username) VALUES (@username)", [ ]
@@ -403,8 +399,8 @@ let tests =
             }
 
             test "Sql.executeTransaction works with existing open connection" {
-                use db = buildDatabase()
-                use connection = new NpgsqlConnection(db.ConnectionString)
+                let db = buildDatabase()
+                use connection = new NpgsqlConnection(db.GetConnectionString())
                 connection.Open()
                 Sql.existingConnection connection
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
@@ -440,8 +436,8 @@ let tests =
             }
 
             test "Sql.executeTransaction works with existing connection" {
-                use db = buildDatabase()
-                use connection = new NpgsqlConnection(db.ConnectionString)
+                let db = buildDatabase()
+                use connection = new NpgsqlConnection(db.GetConnectionString())
                 Sql.existingConnection connection
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
                 |> Sql.executeNonQuery
@@ -476,8 +472,8 @@ let tests =
             }
 
             test "Sql.executeTransaction leaves existing connection open" {
-                use db = buildDatabase()
-                use connection = new NpgsqlConnection(db.ConnectionString)
+                let db = buildDatabase()
+                use connection = new NpgsqlConnection(db.GetConnectionString())
                 connection.Open()
                 Sql.existingConnection connection
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
@@ -515,8 +511,10 @@ let tests =
             }
 
             test "Sql.executeTransaction works with data source" {
-                use db = buildDatabase()
-                use dataSource = NpgsqlDataSource.Create(db.ConnectionString)
+                let db = buildDatabase()
+
+
+                use dataSource = NpgsqlDataSource.Create(db.GetConnectionString())
                 Sql.fromDataSource dataSource
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
                 |> Sql.executeNonQuery
@@ -551,13 +549,15 @@ let tests =
             }
 
             test "Sql.executeNonQuery works" {
-                use db = buildDatabase()
-                Sql.connect db.ConnectionString
+                let db = buildDatabase()
+                db.GetConnectionString()
+                |> Sql.connect
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
                 |> Sql.executeNonQuery
                 |> ignore
 
-                Sql.connect db.ConnectionString
+                db.GetConnectionString()
+                |> Sql.connect
                 |> Sql.executeTransaction [
                     "INSERT INTO users (username, active, salary) VALUES (@username, @active, @salary)", [
                         [ ("@username", Sql.text "first"); ("active", Sql.bit true); ("salary", Sql.money 1.0M)  ]
@@ -567,15 +567,16 @@ let tests =
                 ]
                 |> ignore
 
-                Sql.connect db.ConnectionString
+                db.GetConnectionString()
+                |> Sql.connect
                 |> Sql.query "DELETE FROM users"
                 |> Sql.executeNonQuery
                 |> fun rowsAffected -> Expect.equal 3 rowsAffected "Three entries are deleted"
             }
 
             test "Sql.executeNonQuery works with existing connection" {
-                use db = buildDatabase()
-                use connection = new NpgsqlConnection(db.ConnectionString)
+                let db = buildDatabase()
+                use connection = new NpgsqlConnection(db.GetConnectionString())
                 connection.Open()
                 Sql.existingConnection connection
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
@@ -599,8 +600,8 @@ let tests =
             }
 
             test "Sql.executeNonQuery leaves existing connection open" {
-                use db = buildDatabase()
-                use connection = new NpgsqlConnection(db.ConnectionString)
+                let db = buildDatabase()
+                use connection = new NpgsqlConnection(db.GetConnectionString())
                 connection.Open()
                 Sql.existingConnection connection
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
@@ -626,8 +627,8 @@ let tests =
             }
 
             test "Sql.executeNonQuery works with data source" {
-                use db = buildDatabase()
-                use dataSource = NpgsqlDataSource.Create(db.ConnectionString)
+                let db = buildDatabase()
+                use dataSource = NpgsqlDataSource.Create(db.GetConnectionString())
                 Sql.fromDataSource dataSource
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
                 |> Sql.executeNonQuery
@@ -650,13 +651,15 @@ let tests =
             }
 
             test "Sql.toSeq works" {
-                use db = buildDatabase()
-                Sql.connect db.ConnectionString
+                let db = buildDatabase()
+                db.GetConnectionString()
+                |> Sql.connect
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
                 |> Sql.executeNonQuery
                 |> ignore
 
-                Sql.connect db.ConnectionString
+                db.GetConnectionString()
+                |> Sql.connect
                 |> Sql.executeTransaction [
                     "INSERT INTO users (username, active, salary) VALUES (@username, @active, @salary)", [
                         [ ("@username", Sql.text "first"); ("active", Sql.bit true); ("salary", Sql.money 1.0M)  ]
@@ -673,7 +676,8 @@ let tests =
                 ]
                 
                 let sequence =
-                    Sql.connect db.ConnectionString
+                    db.GetConnectionString()
+                    |> Sql.connect
                     |> Sql.query "SELECT * FROM users"
                     |> Sql.toSeq (fun read ->
                         {|
@@ -698,16 +702,18 @@ let tests =
         ]
 
         testAsync "async query execution works" {
-            use db = buildDatabase()
+            let db = buildDatabase()
             do!
-                Sql.connect db.ConnectionString
+                db.GetConnectionString()
+                |> Sql.connect
                 |> Sql.query "CREATE TABLE users (user_id serial primary key, username text not null, active bit not null, salary money not null)"
                 |> Sql.executeNonQueryAsync
                 |> Async.AwaitTask
                 |> Async.Ignore
 
             do!
-                Sql.connect db.ConnectionString
+                db.GetConnectionString()
+                |> Sql.connect
                 |> Sql.executeTransactionAsync [
                     "INSERT INTO users (username, active, salary) VALUES (@username, @active, @salary)", [
                         [ ("@username", Sql.text "first"); ("active", Sql.bit true); ("salary", Sql.money 1.0M)  ]
@@ -725,7 +731,8 @@ let tests =
             ]
 
             let! users =
-                Sql.connect db.ConnectionString
+                db.GetConnectionString()
+                |> Sql.connect
                 |> Sql.query "SELECT * FROM users"
                 |> Sql.executeAsync (fun read ->
                     {|
@@ -741,8 +748,8 @@ let tests =
 
         testList "Query-only parallel tests without recreating database" [
             test "Null roundtrip" {
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
+                let db = buildDatabase()
+                let connection : string = db.GetConnectionString()
                 connection
                 |> Sql.connect
                 |> Sql.query "SELECT @nullValue::text as output"
@@ -752,9 +759,9 @@ let tests =
             }
 
             test "Bytea roundtrip" {
-                use db = buildDatabase()
+                let db = buildDatabase()
                 let input : array<byte> = [1 .. 5] |> List.map byte |> Array.ofList
-                db.ConnectionString
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "SELECT @manyBytes as output"
                 |> Sql.parameters [ "manyBytes", Sql.bytea input ]
@@ -763,8 +770,8 @@ let tests =
             }
 
             test "bit/bool roundtrip" {
-                use db = buildDatabase()
-                db.ConnectionString
+                let db = buildDatabase()
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "SELECT @logical as output"
                 |> Sql.parameters [ "logical", Sql.bit true ]
@@ -773,9 +780,9 @@ let tests =
             }
 
             test "Uuid roundtrip" {
-                use db = buildDatabase()
+                let db = buildDatabase()
                 let id : Guid = Guid.NewGuid()
-                db.ConnectionString
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "SELECT @uuid_input as output"
                 |> Sql.parameters [ "uuid_input", Sql.uuid id ]
@@ -784,9 +791,9 @@ let tests =
             }
 
             test "Interval roundtrip" {
-                use db = buildDatabase()
+                let db = buildDatabase()
                 let oneHourInterval : TimeSpan = TimeSpan.FromHours 1.0
-                db.ConnectionString
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "SELECT @interval_input as output"
                 |> Sql.parameters [ "interval_input", Sql.interval oneHourInterval ]
@@ -795,8 +802,8 @@ let tests =
             }
 
             test "Money roundtrip with @ sign" {
-                use db = buildDatabase()
-                db.ConnectionString
+                let db = buildDatabase()
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "SELECT @money_input::money as value"
                 |> Sql.parameters [ "@money_input", Sql.money 12.5M ]
@@ -805,11 +812,11 @@ let tests =
             }
 
             test "DateTimeOffset roundtrip when input is UTC" {
-                use db = buildDatabase()
+                let db = buildDatabase()
 
                 let value = DateTimeOffset.UtcNow
 
-                db.ConnectionString
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "SELECT @timestamp::timestamptz as value"
                 |> Sql.parameters [ "@timestamp", Sql.timestamptz value ]
@@ -818,11 +825,11 @@ let tests =
             }
 
             test "DateTime as date roundtrip" {
-                use db = buildDatabase()
+                let db = buildDatabase()
 
                 let value = DateTime.Today
 
-                db.ConnectionString
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "SELECT @date::date as value"
                 |> Sql.parameters [ "@date", Sql.date value ]
@@ -831,11 +838,11 @@ let tests =
             }
 
             test "DateOnly as date roundtrip" {
-                use db = buildDatabase()
+                let db = buildDatabase()
 
                 let value = DateOnly.FromDateTime DateTime.Now
 
-                db.ConnectionString
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "SELECT @date::date as value"
                 |> Sql.parameters [ "@date", Sql.date value ]
@@ -844,11 +851,11 @@ let tests =
             }
 
             test "None DateOnly as date roundtrip" {
-                use db = buildDatabase()
+                let db = buildDatabase()
 
                 let value: DateOnly option = None
 
-                db.ConnectionString
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "SELECT @date::date as value"
                 |> Sql.parameters [ "@date", Sql.dateOrNone value ]
@@ -857,11 +864,11 @@ let tests =
             }
 
             test "ValueSome DateOnly option as date roundtrip" {
-                use db = buildDatabase()
+                let db = buildDatabase()
 
                 let value = DateOnly.FromDateTime DateTime.Now |> ValueSome
 
-                db.ConnectionString
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "SELECT @date::date as value"
                 |> Sql.parameters [ "@date", Sql.dateOrValueNone value ]
@@ -870,8 +877,8 @@ let tests =
             }
 
             test "uuid_generate_v4()" {
-                use db = buildDatabase()
-                db.ConnectionString
+                let db = buildDatabase()
+                db.GetConnectionString()
                 |> Sql.connect
                 |> Sql.query "SELECT uuid_generate_v4() as id"
                 |> Sql.execute (fun read -> read.uuid "id")
@@ -881,8 +888,8 @@ let tests =
             }
 
             test "String option roundtrip" {
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
+                let db = buildDatabase()
+                let connection : string = db.GetConnectionString()
                 let a : string option = Some "abc"
                 let b : string option = None
                 let row =
@@ -900,8 +907,8 @@ let tests =
             }
 
             test "String option roundtrip with existing connection" {
-                use db = buildDatabase()
-                use connection = new NpgsqlConnection(db.ConnectionString)
+                let db = buildDatabase()
+                use connection = new NpgsqlConnection(db.GetConnectionString())
                 connection.Open()
                 let a : string option = Some "abc"
                 let b : string option = None
@@ -920,8 +927,8 @@ let tests =
             }
 
             test "String option roundtrip leaves existing connection open" {
-                use db = buildDatabase()
-                use connection = new NpgsqlConnection(db.ConnectionString)
+                let db = buildDatabase()
+                use connection = new NpgsqlConnection(db.GetConnectionString())
                 connection.Open()
                 let a : string option = Some "abc"
                 let b : string option = None
@@ -936,8 +943,8 @@ let tests =
             }
 
             test "String option roundtrip with data source" {
-                use db = buildDatabase()
-                use dataSource = NpgsqlDataSource.Create(db.ConnectionString)
+                let db = buildDatabase()
+                use dataSource = NpgsqlDataSource.Create(db.GetConnectionString())
                 let a : string option = Some "abc"
                 let b : string option = None
                 let row =
@@ -969,8 +976,8 @@ let tests =
                         ]
                     ]
                     |> ignore
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
+                let db = buildDatabase()
+                let connection : string = db.GetConnectionString()
                 seedDatabase connection
 
                 let table =
@@ -1004,8 +1011,8 @@ let tests =
                     ]
                     |> ignore
 
-                use db = buildDatabase()
-                use connection = new NpgsqlConnection(db.ConnectionString)
+                let db = buildDatabase()
+                use connection = new NpgsqlConnection(db.GetConnectionString())
                 connection.Open()
                 seedDatabase connection
 
@@ -1040,8 +1047,8 @@ let tests =
                     ]
                     |> ignore
 
-                use db = buildDatabase()
-                use dataSource = NpgsqlDataSource.Create(db.ConnectionString)
+                let db = buildDatabase()
+                use dataSource = NpgsqlDataSource.Create(db.GetConnectionString())
                 seedDatabase dataSource
 
                 let table =
@@ -1072,8 +1079,8 @@ let tests =
                     |> ignore
                 let jsonData = "value from F#"
                 let inputJson = "{\"property\": \"" + jsonData + "\"}"
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
+                let db = buildDatabase()
+                let connection : string = db.GetConnectionString()
                 seedDatabase connection inputJson
 
                 let json =
@@ -1095,8 +1102,8 @@ let tests =
                     |> ignore
                 let jsonData = "value from F#"
                 let inputJson = "{\"property\": \"" + jsonData + "\"}"
-                use db = buildDatabase()
-                use connection = new NpgsqlConnection(db.ConnectionString)
+                let db = buildDatabase()
+                use connection = new NpgsqlConnection(db.GetConnectionString())
                 connection.Open()
                 seedDatabase connection inputJson
 
@@ -1119,8 +1126,8 @@ let tests =
                     |> ignore
                 let jsonData = "value from F#"
                 let inputJson = "{\"property\": \"" + jsonData + "\"}"
-                use db = buildDatabase()
-                use dataSource = NpgsqlDataSource.Create(db.ConnectionString)
+                let db = buildDatabase()
+                use dataSource = NpgsqlDataSource.Create(db.GetConnectionString())
                 seedDatabase dataSource inputJson
 
                 let dbJson =
@@ -1151,8 +1158,8 @@ let tests =
                     ]
                     |> ignore
 
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
+                let db = buildDatabase()
+                let connection : string = db.GetConnectionString()
                 seedDatabase connection
 
                 let table =
@@ -1192,8 +1199,8 @@ let tests =
                     ]
                     |> ignore
 
-                use db = buildDatabase()
-                use connection = new NpgsqlConnection(db.ConnectionString)
+                let db = buildDatabase()
+                use connection = new NpgsqlConnection(db.GetConnectionString())
                 connection.Open()
                 seedDatabase connection
 
@@ -1234,8 +1241,8 @@ let tests =
                     ]
                     |> ignore
 
-                use db = buildDatabase()
-                use dataSource = NpgsqlDataSource.Create(db.ConnectionString)
+                let db = buildDatabase()
+                use dataSource = NpgsqlDataSource.Create(db.GetConnectionString())
                 seedDatabase dataSource
 
                 let table =
@@ -1272,8 +1279,8 @@ let tests =
                     ]
                     |> ignore
 
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
+                let db = buildDatabase()
+                let connection : string = db.GetConnectionString()
                 seedDatabase connection
 
                 let table =
@@ -1310,8 +1317,8 @@ let tests =
                     ]
                     |> ignore
 
-                use db = buildDatabase()
-                use connection = new NpgsqlConnection(db.ConnectionString)
+                let db = buildDatabase()
+                use connection = new NpgsqlConnection(db.GetConnectionString())
                 connection.Open()
                 seedDatabase connection
 
@@ -1349,8 +1356,8 @@ let tests =
                     ]
                     |> ignore
 
-                use db = buildDatabase()
-                use dataSource = NpgsqlDataSource.Create(db.ConnectionString)
+                let db = buildDatabase()
+                use dataSource = NpgsqlDataSource.Create(db.GetConnectionString())
                 seedDatabase dataSource
 
                 let table =
@@ -1388,8 +1395,8 @@ let tests =
                     ]
                     |> ignore
 
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
+                let db = buildDatabase()
+                let connection : string = db.GetConnectionString()
                 seedDatabase connection
 
                 let table =
@@ -1411,8 +1418,8 @@ let tests =
             }
             
             test "Handle nullable UUID Array" {
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
+                let db = buildDatabase()
+                let connection : string = db.GetConnectionString()
                 
                 let table =
                     connection
@@ -1449,11 +1456,11 @@ from (
                     ]
                     |> ignore
 
-                use db = buildDatabase()
-                seedDatabase db.ConnectionString
+                let db = buildDatabase()
+                seedDatabase (db.GetConnectionString())
 
                 let table =
-                    db.ConnectionString
+                    db.GetConnectionString()
                     |> Sql.connect
                     |> Sql.query "SELECT * FROM double_array_test"
                     |> Sql.execute (fun read -> {
@@ -1486,10 +1493,10 @@ from (
                     ]
                     |> ignore
 
-                use db = buildDatabase()
-                seedDatabase db.ConnectionString
+                let db = buildDatabase()
+                seedDatabase (db.GetConnectionString())
                 let table =
-                    db.ConnectionString
+                    db.GetConnectionString()
                     |> Sql.connect
                     |> Sql.query "SELECT * FROM decimal_array_test"
                     |> Sql.execute (fun read -> {
@@ -1522,8 +1529,8 @@ from (
                     ]
                     |> ignore
 
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
+                let db = buildDatabase()
+                let connection : string = db.GetConnectionString()
                 seedDatabase connection
 
                 let table =
@@ -1559,8 +1566,8 @@ from (
                     ]
                     |> ignore
 
-                use db = buildDatabase()
-                let connection : string = db.ConnectionString
+                let db = buildDatabase()
+                let connection : string = db.GetConnectionString()
                 seedDatabase connection
 
                 let table =
@@ -1737,13 +1744,18 @@ from (
             }
 
             test "jsonb support works" {
-                use db = buildDatabase()
-                Sql.connect db.ConnectionString
+                let db = buildDatabase()
+
+                let dataSource = (new NpgsqlDataSourceBuilder(db.GetConnectionString())).EnableDynamicJson().Build()
+                
+                dataSource
+                |> Sql.fromDataSource 
                 |> Sql.query "CREATE TABLE json_test (id serial primary key, blob jsonb not null)"
                 |> Sql.executeNonQuery
                 |> ignore
 
-                Sql.connect db.ConnectionString
+                dataSource
+                |> Sql.fromDataSource 
                 |> Sql.executeTransaction [
                     "INSERT INTO json_test (blob) VALUES (@blob)", [
                         [ ("@blob", Sql.jsonb """{"prop1": 123, "prop2": "something"}"""); ]
@@ -1755,7 +1767,8 @@ from (
                     {| id = 1; blob = {prop1=123; prop2="something"} |}
                 ]
 
-                Sql.connect db.ConnectionString
+                dataSource
+                |> Sql.fromDataSource 
                 |> Sql.query "SELECT * FROM json_test"
                 |> Sql.execute (fun read ->
                     {|
@@ -1770,15 +1783,14 @@ from (
 
 let unknownColumnTest =
     test "RowReader raises UnknownColumnException when trying to read unknown column" {
-        use db = buildDatabase()
-
         Expect.throws
             (fun () ->
-                 db.ConnectionString
-                 |> Sql.connect
-                 |> Sql.query "SELECT * FROM UNNEST(ARRAY ['hello', 'world'])"
-                 |> Sql.executeRow (fun read -> read.string "not_a_real_column")
-                 |> ignore)
+                let db = buildDatabase()
+                db.GetConnectionString()
+                |> Sql.connect
+                |> Sql.query "SELECT * FROM UNNEST(ARRAY ['hello', 'world'])"
+                |> Sql.executeRow (fun read -> read.string "not_a_real_column")
+                |> ignore)
             "Check invalid column fails with expected exception type"
     }
 
