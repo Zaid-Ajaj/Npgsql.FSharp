@@ -458,7 +458,8 @@ module Sql =
                 then do! connection.OpenAsync(props.CancellationToken)
                 use command = makeCommand props connection
                 do populateCmd command props
-                if props.NeedPrepare then command.Prepare()
+                if props.NeedPrepare then
+                    do! command.PrepareAsync(props.CancellationToken)
                 use! reader = command.ExecuteReaderAsync props.CancellationToken
                 let postgresReader = unbox<NpgsqlDataReader> reader
                 let rowReader = RowReader(postgresReader)
@@ -482,7 +483,8 @@ module Sql =
                 then do! connection.OpenAsync(props.CancellationToken)
                 use command = makeCommand props connection
                 do populateCmd command props
-                if props.NeedPrepare then command.Prepare()
+                if props.NeedPrepare then
+                    do! command.PrepareAsync(props.CancellationToken)
                 use! reader = command.ExecuteReaderAsync(props.CancellationToken)
                 let postgresReader = unbox<NpgsqlDataReader> reader
                 let rowReader = RowReader(postgresReader)
@@ -504,7 +506,8 @@ module Sql =
                 then do! connection.OpenAsync(props.CancellationToken)
                 use command = makeCommand props connection
                 do populateCmd command props
-                if props.NeedPrepare then command.Prepare()
+                if props.NeedPrepare then
+                    do! command.PrepareAsync(props.CancellationToken)
                 use! reader = command.ExecuteReaderAsync props.CancellationToken
                 let postgresReader = unbox<NpgsqlDataReader> reader
                 let rowReader = RowReader(postgresReader)
@@ -547,7 +550,8 @@ module Sql =
                 then do! connection.OpenAsync props.CancellationToken
                 use command = makeCommand props connection
                 populateCmd command props
-                if props.NeedPrepare then command.Prepare()
+                if props.NeedPrepare then
+                    do! command.PrepareAsync(props.CancellationToken)
                 let! affectedRows = command.ExecuteNonQueryAsync props.CancellationToken
                 return affectedRows
             finally
