@@ -34,6 +34,7 @@ type SqlValue =
     | IntArray of int array
     | ShortArray of int16 array
     | LongArray of int64 array
+    | RealArray of float32 array
     | DoubleArray of double array
     | DecimalArray of decimal array
     | Point of NpgsqlPoint
@@ -147,6 +148,9 @@ type Sql() =
     static member int64Array(value: int64[]) = SqlValue.LongArray value
     static member int64ArrayOrNone(value: int64[] option) = Utils.sqlMap value Sql.int64Array
     static member int64ArrayOrValueNone(value: int64[] voption) = Utils.sqlValueMap value Sql.int64Array
+    static member realArray(value: float32[]) = SqlValue.RealArray value
+    static member realArrayOrNone(value: float32[] option) = Utils.sqlMap value Sql.realArray
+    static member realArrayOrValueNone(value: float32[] voption) = Utils.sqlValueMap value Sql.realArray
     static member doubleArray(value: double[]) = SqlValue.DoubleArray value
     static member doubleArrayOrNone(value: double[] option) = Utils.sqlMap value Sql.doubleArray
     static member doubleArrayOrValueNone(value: double[] voption) = Utils.sqlValueMap value Sql.doubleArray
@@ -281,6 +285,15 @@ type RowReader(reader: NpgsqlDataReader) =
         this.fieldValueOrNone(column)
 
     member this.int64ArrayOrValueNone(column: string) : int64[] voption =
+        this.fieldValueOrValueNone(column)
+
+    member this.realArray(column: string) : float32[] =
+        this.fieldValue(column)
+
+    member this.realArrayOrNone(column: string) : float32[] option =
+        this.fieldValueOrNone(column)
+
+    member this.realArrayOrValueNone(column: string) : float32[] voption =
         this.fieldValueOrValueNone(column)
 
     member this.doubleArray(column: string) : double[] =
