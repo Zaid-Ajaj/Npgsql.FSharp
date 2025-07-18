@@ -238,6 +238,7 @@ module Sql =
             | SqlValue.IntArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Integer)
             | SqlValue.ShortArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Smallint)
             | SqlValue.LongArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Bigint)
+            | SqlValue.RealArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Real)
             | SqlValue.DoubleArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Double)
             | SqlValue.DecimalArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Numeric)
             | SqlValue.Real x -> add x NpgsqlDbType.Real
@@ -286,6 +287,7 @@ module Sql =
             | SqlValue.IntArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Integer)
             | SqlValue.ShortArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Smallint)
             | SqlValue.LongArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Bigint)
+            | SqlValue.RealArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Real)
             | SqlValue.DoubleArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Double)
             | SqlValue.DecimalArray x -> add x (NpgsqlDbType.Array ||| NpgsqlDbType.Numeric)
             | SqlValue.Real x -> add x NpgsqlDbType.Real

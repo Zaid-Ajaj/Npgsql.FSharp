@@ -28,6 +28,11 @@ type IntArrayTest = {
     integers: int array
 }
 
+type RealArrayTest = {
+    id: int
+    reals: float32 array
+}
+
 type DoubleArrayTest = {
     id: int
     doubles: double array
@@ -68,6 +73,7 @@ let buildDatabase() : PostgreSqlContainer =
     let createStringArrayTable = "create table if not exists string_array_test (id int, values text [])"
     let createUuidArrayTable = "create table if not exists uuid_array_test (id int, values uuid [])"
     let createIntArrayTable = "create table if not exists int_array_test (id int, integers int [])"
+    let createRealArrayTable = "create table if not exists real_array_test (id int, reals real [])"
     let createDoubleArrayTable = "create table if not exists double_array_test (id int, doubles double precision [])"
     let createDecimalArrayTable = "create table if not exists decimal_array_test (id int, decimals money [])"
     let createPointTable = "create table if not exists point_test (id int, test_point point)"
@@ -89,6 +95,7 @@ let buildDatabase() : PostgreSqlContainer =
         createStringArrayTable, [ ]
         createExtensionHStore, [ ]
         createIntArrayTable, [ ]
+        createRealArrayTable, [ ]
         createDoubleArrayTable, [ ]
         createDecimalArrayTable, [ ]
         createExtensionUuid, [ ]
@@ -1438,6 +1445,43 @@ from (
                 ]
 
                 Expect.equal expected table "All rows"
+            }
+
+            test "Handle real Array" {
+                let a = [| 1.f; 2.f |]
+                let b = [| for i in 0..10 do yield (float32 i) |]
+                let c : float32 array = [||]
+                let seedDatabase (connection: string) =
+                    connection
+                    |> Sql.connect
+                    |> Sql.executeTransaction [
+                        "INSERT INTO real_array_test (id, reals) values (@id, @reals)", [
+                            [ "@id", Sql.int 1; "@reals", Sql.realArray a ]
+                            [ "@id", Sql.int 2; "@reals", Sql.realArray b ]
+                            [ "@id", Sql.int 3; "@reals", Sql.realArray c ]
+                        ]
+                    ]
+                    |> ignore
+
+                let db = buildDatabase()
+                seedDatabase (db.GetConnectionString())
+
+                let table =
+                    db.GetConnectionString()
+                    |> Sql.connect
+                    |> Sql.query "SELECT * FROM real_array_test"
+                    |> Sql.execute (fun read -> {
+                        id = read.int "id"
+                        reals = read.realArray "reals"
+                    })
+
+                let expected = [
+                    { id = 1; reals = a }
+                    { id = 2; reals = b }
+                    { id = 3; reals = c }
+                ]
+
+                Expect.equal expected table  "All rows from `real_array_test` table"
             }
 
             test "Handle double Array" {
